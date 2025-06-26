@@ -2,9 +2,10 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import connectionDB from "./DB/connection.js";
-import { apiRateLimiter } from "./src/middlwares/rateLimiter.js";
-import { globalErrorHandler } from "./src/middlwares/globalErrorHandler.js";
-import { notFoundHandler } from "./src/middlwares/notFound.js";
+import { redis } from "./src/utils/redisClient.js";
+import { apiRateLimiter } from "./src/middlewares/rateLimiter.js";
+import { globalErrorHandler } from "./src/middlewares/globalErrorHandler.js";
+import { notFoundHandler } from "./src/middlewares/notFound.js";
 import appRouter from "./src/app.router.js";
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.use(notFoundHandler);
 
 // global error handler
 app.use(globalErrorHandler);
+
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
