@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 const Schema = mongoose.Schema;
-
 
 const userSchema = new Schema(
   {
@@ -35,7 +35,7 @@ const userSchema = new Schema(
     },
     phone: {
       type: String,
-      required: [true, "Phone number is required"],
+      // required: [true, "Phone number is required"],
       match: [
         /^[+]?[0-9\s\-\(\)]{10,15}$/,
         "Please provide a valid phone number",
@@ -76,6 +76,8 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    activationCodeEmail: String,
+
     isEmailVerified: {
       type: Boolean,
       default: false,
@@ -214,7 +216,10 @@ userSchema.methods.incLoginAttempts = function () {
 
   return this.updateOne(updates);
 };
-export default mongoose.model("User", userSchema);
+
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+
+export default User
 
 /*
 
