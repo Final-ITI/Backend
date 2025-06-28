@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
 export const registerValidation = [
   body("firstName")
@@ -62,6 +62,45 @@ export const registerValidation = [
     .withMessage("Country is required.")
     .isLength({ min: 2, max: 50 })
     .withMessage("Country must be between 2 and 50 characters long.")
+    .trim()
+    .escape(),
+];
+
+export const activateCodeEmailValidation = [
+  param("activationCodeEmail")
+    .notEmpty()
+    .withMessage("Activation code is required.")
+    .isString()
+    .withMessage("Activation code must be a string.")
+    .trim()
+    .escape(),
+];
+
+export const loginValidation = [
+  body("email")
+    .isEmail()
+    .withMessage("Please enter a valid email address.")
+    .normalizeEmail(),
+
+  body("password").notEmpty().withMessage("Password is required."),
+];
+
+export const logoutValidation = [
+  body("refreshToken")
+    .notEmpty()
+    .withMessage("Refresh token is required.")
+    .isString()
+    .withMessage("Refresh token must be a string.")
+    .trim()
+    .escape(),
+];
+
+export const refreshTokenValidation = [
+  body("refreshToken")
+    .notEmpty()
+    .withMessage("Refresh token is required.")
+    .isString()
+    .withMessage("Refresh token must be a string.")
     .trim()
     .escape(),
 ];
