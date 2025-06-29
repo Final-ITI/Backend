@@ -209,10 +209,6 @@ router.get("/academy/:academyId", authenticate, authorizeTenant, (req, res) => {
 
 1. **`authenticate`**: Verifies JWT access token and loads user
 2. **`authorize(...roles)`**: Checks if user has required roles
-3. **`authorizeTenant`**: Ensures user can only access their academy
-4. **`optionalAuth`**: Optional authentication (doesn't fail if no token)
-5. **`verifyTokenOnly`**: Fast token verification without database check
-6. **`hasPermission(permission)`**: Checks specific permissions
 
 ## Security Features
 
@@ -276,13 +272,3 @@ Common error codes:
 4. Old refresh token is revoked
 5. New tokens are returned to client
 
-## Session Management
-
-Users can:
-
-- View all active sessions
-- Logout from current device
-- Logout from all devices
-- See device information for each session
-
-This provides complete control over user sessions and enhances security.
