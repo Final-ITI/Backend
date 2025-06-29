@@ -15,6 +15,9 @@ import {
   logout,
   refreshToken,
   logoutAllDevices,
+  forgetPassword,
+  verifyResetCode,
+  resetPassword,
 } from "./auth.controller.js";
 
 const router = Router();
@@ -33,5 +36,8 @@ router.post("/refresh-token", validate(refreshTokenValidation), refreshToken);
 // Protected routes (require authentication)
 router.post("/logout-all", authenticate, logoutAllDevices);
 
+router.post("/forget-password", forgetPassword);
+router.post("/verify-reset-code", verifyResetCode);
+router.put("/reset-password", resetPassword);
 
 export default router;

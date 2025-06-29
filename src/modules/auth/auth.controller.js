@@ -1,13 +1,17 @@
+import { createHash } from "crypto";
 import jwt from "jsonwebtoken";
-import { EmailService } from "../../services/email.service.js";
+import { EmailService, AuthMailService } from "../../services/email.service.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
 import User from "../../../DB/models/user.js";
 import Token from "../../../DB/models/token.js";
-import { created, success } from "../../utils/apiResponse.js";
-import { detectDeviceType, extractDeviceInfo, generateTokens } from "../../utils/token.js";
+import { created, success, error, notFound } from "../../utils/apiResponse.js";
+import {
+  detectDeviceType,
+  extractDeviceInfo,
+  generateTokens,
+} from "../../utils/token.js";
 
 export const register = asyncHandler(async (req, res) => {
-    
   const { firstName, lastName, email, password, gender, role, country } =
     req.body;
   // Check Email
@@ -344,3 +348,155 @@ export const logoutAllDevices = asyncHandler(async (req, res) => {
   success(res, null, "Logged out from all devices successfully");
 });
 
+export const forgetPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) return notFound(res, "User not found");
+
+  try {
+    await AuthMailService.sendResetCodeEmail(user);
+    return success(res, null, "Reset code sent to your email.");
+  } catch (err) {
+    // Clean up on failure
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.passwordResetIsVerified = false;
+    await user.save();
+
+    return error(res, "Failed to send reset code", 500, {
+      message: err.message,
+      stack: err.stack,
+    });
+  }
+});
+
+export const verifyResetCode = asyncHandler(async (req, res) => {
+  const { resetCode } = req.body;
+  const hashed = createHash("sha256").update(resetCode).digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashed,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user) return error(res, "Invalid or expired reset code", 400);
+
+  user.passwordResetIsVerified = true;
+  await user.save();
+
+  return success(res, null, "Reset code verified successfully.");
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { resetCode, newPassword } = req.body;
+  const hashed = createHash("sha256").update(resetCode).digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashed,
+    passwordResetIsVerified: true,
+  });
+
+  if (!user) {
+    return error(res, "Invalid or expired reset code", 400);
+  }
+
+  // Update user password
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  user.passwordResetIsVerified = false;
+  user.passwordChangedAt = Date.now();
+  await user.save();
+
+  // Generate tokens
+  const { accessToken, refreshToken } = generateTokens(
+    user._id,
+    user.userType,
+    user.tenantId
+  );
+
+  // Set token expiration times
+  const accessTokenExpires = new Date(
+    Date.now() + parseInt(process.env.ACCESS_TOKEN_EXPIRES || "15") * 60 * 1000
+  );
+  const refreshTokenExpires = new Date(
+    Date.now() +
+      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+  );
+
+  // Get device info
+  const userAgent = req.headers["user-agent"];
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const deviceType = detectDeviceType(userAgent);
+  const { browser, os } = extractDeviceInfo(userAgent);
+
+  const deviceInfo = {
+    userAgent,
+    ipAddress,
+    deviceType,
+    browser,
+    os,
+  };
+
+  // Store tokens in database
+  const [accessTokenDoc, refreshTokenDoc] = await Promise.all([
+    Token.createToken({
+      user: user._id,
+      tokenType: "access",
+      token: accessToken,
+      expiresAt: accessTokenExpires,
+      deviceInfo,
+      tenantId: user.tenantId,
+    }),
+    Token.createToken({
+      user: user._id,
+      tokenType: "refresh",
+      token: refreshToken,
+      expiresAt: refreshTokenExpires,
+      deviceInfo,
+      tenantId: user.tenantId,
+    }),
+  ]);
+
+  // Link refresh token chain
+  if (accessTokenDoc && refreshTokenDoc) {
+    refreshTokenDoc.refreshTokenChain.previousToken = null;
+    refreshTokenDoc.refreshTokenChain.nextToken = null;
+    await refreshTokenDoc.save();
+  }
+
+  // Prepare user data
+  const userData = {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    userType: user.userType,
+    isEmailVerified: user.isEmailVerified,
+    profilePicture: user.profilePicture,
+    tenantId: user.tenantId,
+    lastLogin: user.lastLogin,
+  };
+
+  // Send success response
+  return success(
+    res,
+    {
+      user: userData,
+      tokens: {
+        accessToken,
+        refreshToken,
+        accessTokenExpires,
+        refreshTokenExpires,
+      },
+      deviceInfo: {
+        deviceType,
+        browser,
+        os,
+        ipAddress,
+      },
+    },
+    "Password reset successfully."
+  );
+});

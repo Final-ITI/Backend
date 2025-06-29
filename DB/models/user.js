@@ -113,6 +113,7 @@ const userSchema = new Schema(
     emailVerificationExpires: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
+    passwordResetIsVerified: { type: Boolean, default: false },
     passwordChangedAt: Date,
     // Login attempts and account lockout
     loginAttempts: {
@@ -219,7 +220,7 @@ userSchema.methods.incLoginAttempts = function () {
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
-export default User
+export default User;
 
 /*
 

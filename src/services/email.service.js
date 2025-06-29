@@ -1,5 +1,9 @@
+import { createHash } from "crypto";
 
-import { generateActivationEmail } from "../utils/mail/generateHTML.js";
+import {
+  generateActivationEmail,
+  resetPasswordTemp,
+} from "../utils/mail/generateHTML.js";
 import { sendEmail } from "../utils/mail/sendMail.js";
 
 export const EmailService = {
@@ -13,5 +17,28 @@ export const EmailService = {
       subject: "Activate Account",
       html,
     });
+  },
+};
+
+export const AuthMailService = {
+  async sendResetCodeEmail(user) {
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedCode = createHash("sha256").update(resetCode).digest("hex");
+
+    // Update user with code + expiry
+    user.passwordResetToken = hashedCode;
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 mins
+    user.passwordResetIsVerified = false;
+    await user.save();
+
+    const html = resetPasswordTemp(user.firstName, resetCode);
+
+    await sendEmail({
+      to: user.email,
+      subject: "Motken Password Reset Code",
+      html,
+    });
+
+    return true;
   },
 };
