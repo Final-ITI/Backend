@@ -11,6 +11,13 @@ export const appRouter = (app, express) => {
   app.use(express.json());
   app.use(apiRateLimiter);
 
+  app.use("/", (req, res) => {
+    res.status(200).json({
+      message: "Welcome to the API",
+      status: "success",
+    });
+  });
+
   // Import routes
   app.use("/api/v1/auth", authRouter,register);
 
