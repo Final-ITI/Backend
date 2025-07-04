@@ -20,6 +20,7 @@ const teacherSchema = new Schema(
       type: String,
       enum: ["freelance", "academy_employed"],
       required: [true, "Teacher type is required"],
+      default: "freelance",
     },
     halakat: [
       {
@@ -28,10 +29,9 @@ const teacherSchema = new Schema(
       },
     ],
     // Professional Information
-    qualification: {
+    skills: {
       type: String,
-      required: [true, "Qualification is required"],
-      maxlength: [200, "Qualification cannot exceed 200 characters"],
+      required: [true, "Skills is required"],
     },
     experience: {
       type: Number,
@@ -53,55 +53,26 @@ const teacherSchema = new Schema(
         ],
       },
     ],
-    // Teaching Preferences and Availability
-    teachingPreferences: {
-      preferredStudentGender: {
-        type: String,
-        enum: ["same_gender_only", "any", "male_only", "female_only"],
-        default: "same_gender_only",
-      },
-      ageGroups: [
-        {
-          type: String,
-          enum: [
-            "children_5_10",
-            "youth_11_17",
-            "adults_18_35",
-            "seniors_35_plus",
-          ],
-        },
-      ],
-      classTypes: [
-        {
-          type: String,
-          enum: [
-            "individual",
-            "group_small",
-            "group_large",
-            "online",
-            "offline",
-          ],
-        },
-      ],
+    bio: {
+      type: String,
+      required: true,
+      maxlength: [500, "Bio cannot exceed 500 characters"],
+    },
+    id_number: {
+      type: String,
+      required: true,
+      maxlength: 14,
+      minlength: 14,
     },
     // Pricing (for freelance teachers)
-    pricing: {
-      individualSession: {
-        type: Number,
-        min: [0, "Price cannot be negative"],
-      },
-      groupSession: {
-        type: Number,
-        min: [0, "Price cannot be negative"],
-      },
-      monthlyPackage: {
-        type: Number,
-        min: [0, "Price cannot be negative"],
-      },
-      currency: {
-        type: String,
-        default: "SAR",
-      },
+    sessionPrice: { // private
+      type: String,
+      required: true,
+      min: 1,
+    },
+    currency: {
+      type: String,
+      default: "EGP",
     },
 
     bankingInfo: {
@@ -148,11 +119,6 @@ const teacherSchema = new Schema(
         type: Number,
         default: 0,
       },
-    },
-    // Status and Verification
-    isActive: {
-      type: Boolean,
-      default: true,
     },
     isVerified: { type: Boolean, default: false },
     verificationStatus: {
@@ -207,7 +173,6 @@ teacherSchema.index({ teacherType: 1 });
 teacherSchema.index({ isActive: 1, isVerified: 1 });
 teacherSchema.index({ verificationStatus: 1 });
 teacherSchema.index({ specialization: 1 });
-teacherSchema.index({ "teachingPreferences.preferredStudentGender": 1 });
 
 // Compound indexes for search
 teacherSchema.index({ specialization: 1, "performance.rating": -1 });

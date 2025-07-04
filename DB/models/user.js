@@ -66,16 +66,7 @@ const userSchema = new Schema(
     // Address Information
     address: String,
     country: { type: String, default: "Egypt" },
-
-    // Account Status
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
+    
     activationCodeEmail: String,
 
     isEmailVerified: {
@@ -97,17 +88,11 @@ const userSchema = new Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
-
     // Profile Information
     profilePicture: {
       type: String,
       default: null,
     },
-    bio: {
-      type: String,
-      maxlength: [500, "Bio cannot exceed 500 characters"],
-    },
-
     // Authentication & Security
     emailVerificationToken: String,
     emailVerificationExpires: Date,

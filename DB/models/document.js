@@ -14,26 +14,39 @@ const documentSchema = new Schema(
       required: true,
       refPath: "ownerType",
     },
-
+    // user: {
+    //   type: Schema.Types.ObjectId,
+    //   required: true,
+    //   ref: "User",
+    // },
     // Document classification
-    docType: {
-      type: String,
-      required: true,
-      enum: [
-        "student_id",
-        "birth_certificate",
-        "guardian_id",
-        "teaching_license",
-        "qualification_certificate",
-        "tajweed_certification",
-        "academy_license",
-        "commercial_registration",
-      ],
-    },
+    // docType: {
+    //   type: String,
+    //   required: true,
+    //   enum: [
+    //     "student_id",
+    //     "birth_certificate",
+    //     "guardian_id",
+    //     "teaching_license",
+    //     "qualification_certificate",
+    //     "tajweed_certification",
+    //     "academy_license",
+    //     "commercial_registration",
+    //   ],
+    // },
 
     // File management
     fileUrl: { type: String, required: true },
     fileHash: { type: String, required: true },
+
+    // national_id_front:{
+    //   url:{
+
+    //   },
+    //   id:{
+
+    //   }
+    // }
 
     // Verification lifecycle (admin-controlled)
     status: {

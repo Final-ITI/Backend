@@ -7,6 +7,11 @@ const halakaSchema = new Schema(
     title: { type: String, required: true },
     description: String,
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
+    student:{type: Schema.Types.ObjectId, ref: "Student"},
+    halqaType:{
+      required:true,
+      enum:['private','halqa']
+    },
     schedule: {
       frequency: {
         type: String,
@@ -27,8 +32,10 @@ const halakaSchema = new Schema(
           ],
         },
       ],
+      
       startTime: { type: String, required: true },
-      duration: { type: Number, required: true },
+      endTime :{},
+      duration: { type: Number},
       startDate: { type: Date, required: true },
       endDate: Date,
       timezone: { type: String, default: "Africa/Cairo" },
@@ -47,6 +54,24 @@ const halakaSchema = new Schema(
       password: String,
     },
     price: { type: Number, required: true },
+    //     pricing: {
+    //   individualSession: {
+    //     type: Number,
+    //     min: [0, "Price cannot be negative"],
+    //   },
+    //   groupSession: {
+    //     type: Number,
+    //     min: [0, "Price cannot be negative"],
+    //   },
+    //   monthlyPackage: {
+    //     type: Number,
+    //     min: [0, "Price cannot be negative"],
+    //   },
+    //   currency: {
+    //     type: String,
+    //     default: "SAR",
+    //   },
+    // },
     status: {
       type: String,
       enum: ["scheduled", "active", "completed", "cancelled"],
