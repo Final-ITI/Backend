@@ -4,6 +4,7 @@ import { notFoundHandler } from "./middlewares/notFound.js";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 import authRouter from "./modules/auth/auth.router.js";
 import { register } from "./modules/auth/auth.controller.js";
+import chatRouter from "./modules/chat/chat.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -19,7 +20,8 @@ export const appRouter = (app, express) => {
   });
 
   // Import routes
-  app.use("/api/v1/auth", authRouter,register);
+  app.use("/api/v1/auth", authRouter, register);
+  app.use("/api/v1/chat", chatRouter);
 
   // 404 handler
   app.use(notFoundHandler);

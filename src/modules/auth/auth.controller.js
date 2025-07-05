@@ -85,9 +85,9 @@ export const login = asyncHandler(async (req, res) => {
   }
 
   // Check if account is active
-  if (!user.isActive) {
-    throw new ApiError("Account is deactivated. Please contact support.", 401);
-  }
+  // if (!user.isActive) {
+  //   throw new ApiError("Account is deactivated. Please contact support.", 401);
+  // }
 
   // Check if email is verified
   if (!user.isEmailVerified) {
