@@ -4,9 +4,7 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 import {
   activateCodeEmailValidation,
   loginValidation,
-  registerValidation,
-  logoutValidation,
-  
+  registerValidation, 
 } from "./auth.validation.js";
 import {
   register,
@@ -30,7 +28,7 @@ router.get(
   activateEmail
 );
 router.post("/login", validate(loginValidation), login);
-router.post("/logout", validate(logoutValidation), logout);
+router.post("/logout", logout);
 router.post("/refresh-token", refreshToken);
 
 // Protected routes (require authentication)
