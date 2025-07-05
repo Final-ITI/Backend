@@ -50,11 +50,55 @@ export const getMessages = asyncHandler(async (req, res) => {
 
     const conversation = await Conversation.findOne({
         participants: { $all: [senderId, userToChatId] },
-    }).populate("message");
+    }).populate({
+        path: "message",
+        populate: [
+            { path: "senderId", select: "firstName lastName profilePicture" },
+            { path: "receiverId", select: "firstName lastName profilePicture" }
+        ]
+    });
 
     if (!conversation) return res.status(200).json([]);
 
     const messages = conversation.message;
 
     res.status(200).json(messages);
+});
+
+export const getConversations = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    // Find all conversations where the user is a participant
+    const conversations = await Conversation.find({
+        participants: userId
+    })
+        .populate({
+            path: "participants",
+            select: "firstName lastName profilePicture"
+        })
+        .populate({
+            path: "message",
+            options: { sort: { createdAt: -1 } },
+            populate: [
+                { path: "senderId", select: "firstName lastName profilePicture" },
+                { path: "receiverId", select: "firstName lastName profilePicture" }
+            ]
+        });
+
+    // Format the response: for each conversation, return the other user and the last message
+    const result = conversations.map(conv => {
+        // Get the other participant
+        const otherUser = conv.participants.find(p => p._id.toString() !== userId.toString());
+        // Get the last message (most recent)
+        const lastMessage = Array.isArray(conv.message) && conv.message.length > 0
+            ? conv.message[conv.message.length - 1]
+            : null;
+        return {
+            conversationId: conv._id,
+            user: otherUser,
+            lastMessage
+        };
+    });
+
+    res.status(200).json(result);
 }); 
