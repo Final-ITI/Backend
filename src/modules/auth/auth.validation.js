@@ -95,12 +95,4 @@ export const logoutValidation = [
     .escape(),
 ];
 
-export const refreshTokenValidation = [
-  body("refreshToken")
-    .notEmpty()
-    .withMessage("Refresh token is required.")
-    .isString()
-    .withMessage("Refresh token must be a string.")
-    .trim()
-    .escape(),
-];
+

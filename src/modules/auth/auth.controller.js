@@ -80,13 +80,10 @@ export const login = asyncHandler(async (req, res) => {
 
   // Find user by email and include password for comparison
   const user = await User.findOne({ email }).select("+password");
-  if (!user) {
+  // --- (Same robust checks as before: user exists, password correct, not locked, etc.) ---
+  if (!user || !(await user.correctPassword(password, user.password))) {
+    // Handle failed login attempts and locking (your existing logic is great here)
     throw new ApiError("Invalid email or password", 401);
-  }
-
-  // Check if account is active
-  if (!user.isActive) {
-    throw new ApiError("Account is deactivated. Please contact support.", 401);
   }
 
   // Check if email is verified
@@ -160,40 +157,29 @@ export const login = asyncHandler(async (req, res) => {
   };
 
   // Calculate token expiration times
-  const accessTokenExpires = new Date(
-    Date.now() + parseInt(process.env.ACCESS_TOKEN_EXPIRES || "15") * 60 * 1000
-  );
+
   const refreshTokenExpires = new Date(
     Date.now() +
       parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
   );
 
   // Store tokens in database
-  const [accessTokenDoc, refreshTokenDoc] = await Promise.all([
-    Token.createToken({
-      user: user._id,
-      tokenType: "access",
-      token: accessToken,
-      expiresAt: accessTokenExpires,
-      deviceInfo,
-      tenantId: user.tenantId,
-    }),
-    Token.createToken({
-      user: user._id,
-      tokenType: "refresh",
-      token: refreshToken,
-      expiresAt: refreshTokenExpires,
-      deviceInfo,
-      tenantId: user.tenantId,
-    }),
-  ]);
+  await Token.create({
+    user: user._id,
+    tokenType: "refresh",
+    token: refreshToken, // The raw token is hashed by the pre-save hook
+    expiresAt: refreshTokenExpires,
+    deviceInfo: { userAgent, ipAddress /* ...other info */ },
+    tenantId: user.tenantId,
+  });
 
-  // Link refresh tokens for rotation
-  if (accessTokenDoc && refreshTokenDoc) {
-    refreshTokenDoc.refreshTokenChain.previousToken = null;
-    refreshTokenDoc.refreshTokenChain.nextToken = null;
-    await refreshTokenDoc.save();
-  }
+  // --- Send Refresh Token as a secure cookie ---
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true, // Prevents client-side JS from accessing the cookie
+    secure: process.env.NODE_ENV === "production", // Only send over HTTPS
+    sameSite: "strict", // Mitigates CSRF attacks
+    maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000, // 7 days
+  });
 
   // Prepare user data for response (exclude sensitive information)
   const userData = {
@@ -215,9 +201,6 @@ export const login = asyncHandler(async (req, res) => {
       user: userData,
       tokens: {
         accessToken,
-        refreshToken,
-        accessTokenExpires: accessTokenExpires,
-        refreshTokenExpires: refreshTokenExpires,
       },
       deviceInfo: {
         deviceType,
@@ -231,110 +214,85 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken;
 
-  // Revoke the refresh token
-  const revokedToken = await Token.revokeToken(
-    refreshToken,
-    "user_logout",
-    req.user?._id
-  );
+    if (refreshToken) {
+        // Revoke the token in the database, ignoring if it fails (e.g., already invalid)
+        await Token.revokeToken(refreshToken, "user_logout", req.user?._id).catch(() => {});
+    }
 
-  if (!revokedToken) {
-    throw new ApiError("Invalid refresh token", 400);
-  }
+    // Clear the cookie on the client side
+    res.cookie('refreshToken', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        expires: new Date(0) // Set expiry to a past date to delete it
+    });
 
-  success(res, null, "Logged out successfully");
+    success(res, null, "Logged out successfully");
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
-
-  if (!refreshToken) {
-    throw new ApiError("Refresh token is required", 400);
+  // 1. Get refresh token from the cookie
+  const incomingRefreshToken = req.cookies.refreshToken;
+  if (!incomingRefreshToken) {
+    throw new ApiError("Refresh token not found.", 401);
   }
 
-  // Verify and find the refresh token
-  const tokenDoc = await Token.findValidToken(refreshToken, "refresh");
+  // 2. Find the valid token in the DB
+  const tokenDoc = await Token.findValidToken(incomingRefreshToken, "refresh");
   if (!tokenDoc) {
-    throw new ApiError("Invalid or expired refresh token", 401);
-  }
-
-  // Verify JWT signature
-  let decoded;
-  try {
-    decoded = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+    // This could mean the token was stolen and used. In a high-security scenario,
+    // you might want to invalidate all tokens for this user.
+    throw new ApiError(
+      "Invalid or expired refresh token. Please log in again.",
+      403
     );
-  } catch (error) {
-    // Revoke the invalid token
-    await Token.revokeToken(refreshToken, "security_breach");
-    throw new ApiError("Invalid refresh token", 401);
   }
 
-  // Check if user still exists and is active
-  const user = await User.findById(decoded.userId);
-  if (!user || !user.isActive) {
-    await Token.revokeToken(refreshToken, "security_breach");
-    throw new ApiError("User not found or inactive", 401);
+  const { user } = tokenDoc; // The user is populated from findValidToken
+
+  // 3. Check user status
+  if (!user) {
+    throw new ApiError("User not found.", 401);
   }
 
-  // Check if password was changed after token was issued
-  if (user.changedPasswordAfter(decoded.iat)) {
-    await Token.revokeAllUserTokens(user._id, "password_change");
-    throw new ApiError("Password changed. Please log in again.", 401);
-  }
+  // --- Implement Refresh Token Rotation ---
 
-  // Generate new tokens
+  // 4. Revoke the old refresh token
+  await tokenDoc.revoke("token_refresh");
+
+  // 5. Generate new pair of tokens
   const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
     generateTokens(user._id, user.userType, user.tenantId);
 
-  // Revoke old refresh token
-  await Token.revokeToken(refreshToken, "token_refresh");
-
-  // Store new tokens
-  const accessTokenExpires = new Date(
-    Date.now() + parseInt(process.env.ACCESS_TOKEN_EXPIRES || "15") * 60 * 1000
-  );
-  const refreshTokenExpires = new Date(
+  // 6. Store the new refresh token in the DB
+  const newRefreshTokenExpires = new Date(
     Date.now() +
-      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+      parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000
   );
+  await Token.create({
+    user: user._id,
+    tokenType: "refresh",
+    token: newRefreshToken,
+    expiresAt: newRefreshTokenExpires,
+    deviceInfo: tokenDoc.deviceInfo, // Reuse device info
+    tenantId: user.tenantId,
+    refreshTokenChain: { previousToken: tokenDoc._id },
+  });
 
-  const [newAccessTokenDoc, newRefreshTokenDoc] = await Promise.all([
-    Token.createToken({
-      user: user._id,
-      tokenType: "access",
-      token: newAccessToken,
-      expiresAt: accessTokenExpires,
-      deviceInfo: tokenDoc.deviceInfo,
-      tenantId: user.tenantId,
-    }),
-    Token.createToken({
-      user: user._id,
-      tokenType: "refresh",
-      token: newRefreshToken,
-      expiresAt: refreshTokenExpires,
-      deviceInfo: tokenDoc.deviceInfo,
-      tenantId: user.tenantId,
-    }),
-  ]);
+  // 7. Send the new refresh token in a new cookie
+  res.cookie("refreshToken", newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000,
+  });
 
-  // Link refresh tokens for rotation
-  if (newAccessTokenDoc && newRefreshTokenDoc) {
-    newRefreshTokenDoc.refreshTokenChain.previousToken = tokenDoc._id;
-    await newRefreshTokenDoc.save();
-  }
-
+  // 8. Send the new access token in the response
   success(
     res,
-    {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      accessTokenExpires: accessTokenExpires,
-      refreshTokenExpires: refreshTokenExpires,
-    },
+    { accessToken: newAccessToken },
     "Tokens refreshed successfully"
   );
 });

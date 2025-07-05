@@ -6,7 +6,7 @@ import {
   loginValidation,
   registerValidation,
   logoutValidation,
-  refreshTokenValidation,
+  
 } from "./auth.validation.js";
 import {
   register,
@@ -31,7 +31,7 @@ router.get(
 );
 router.post("/login", validate(loginValidation), login);
 router.post("/logout", validate(logoutValidation), logout);
-router.post("/refresh-token", validate(refreshTokenValidation), refreshToken);
+router.post("/refresh-token", refreshToken);
 
 // Protected routes (require authentication)
 router.post("/logout-all", authenticate, logoutAllDevices);

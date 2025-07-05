@@ -70,14 +70,19 @@ const tokenSchema = new Schema(
     },
     revocationReason: {
       type: String,
-      enum: [
-        "user_logout",
-        "password_change",
-        "security_breach",
-        "admin_revocation",
-        "expired",
-        "other",
-      ],
+      enum: {
+        values: [
+          "user_logout",
+          "user_logout_all",
+          "password_change",
+          "security_breach",
+          "admin_revocation",
+          "expired",
+          "token_refresh",
+          "other",
+        ],
+        message: "Value {VALUE} is not a valid reason for revocation.",
+      },
       default: null,
     },
 

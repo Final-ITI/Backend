@@ -139,7 +139,7 @@ userSchema.index({ email: 1 });
 userSchema.index({ userType: 1 });
 userSchema.index({ tenantId: 1, userType: 1 });
 userSchema.index({ verificationStatus: 1 });
-userSchema.index({ isActive: 1, isVerified: 1 });
+// userSchema.index({ isActive: 1, isVerified: 1 });
 
 // Pre-save middleware for password hashing
 userSchema.pre("save", async function (next) {

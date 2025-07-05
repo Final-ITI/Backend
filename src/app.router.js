@@ -4,13 +4,13 @@ import { notFoundHandler } from "./middlewares/notFound.js";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 import authRouter from "./modules/auth/auth.router.js";
 import { register } from "./modules/auth/auth.controller.js";
-
+import cookieParser from 'cookie-parser';
 export const appRouter = (app, express) => {
   // global middlewares
   app.use(cors());
   app.use(express.json());
   app.use(apiRateLimiter);
-
+app.use(cookieParser());
   app.get("/", (req, res) => {
     res.status(200).json({
       message: "Welcome to the API",
