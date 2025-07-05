@@ -1,11 +1,11 @@
 import { io } from "socket.io-client";
 
-const USER_ID = "6862d2ec4fe3da7d2e9d417c"; // <-- Replace with a real user ID from your DB
+const USER_ID = "6862d2ec4fe3da7d2e9d417c"; 
 
-const socket = io("ws://localhost:6001", {
+const socket = io("ws://localhost:4000", {
     path: "/chat",
-    query: { userId: USER_ID },
-});
+    query: { userId: USER_ID }
+  });
 
 socket.on("connect", () => {
     console.log("Connected to Socket.IO server:", socket.id);

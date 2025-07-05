@@ -1,7 +1,7 @@
 import Conversation from "../../../DB/models/conversation.js";
 import Message from "../../../DB/models/message.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
-import { redis } from "../../utils/redisClient.js";
+import { userSocketMap, io } from "../../socket/socket.js";
 
 export const sendMessage = asyncHandler(async (req, res) => {
     const { message } = req.body;
@@ -31,9 +31,12 @@ export const sendMessage = asyncHandler(async (req, res) => {
     conversation.message.push(newMessage._id);
     await Promise.all([conversation.save(), newMessage.save()]);
 
-    // Publish to Redis for real-time delivery
-    await redis.publish('chat:messages', JSON.stringify({ receiverId, message: newMessage }));
-    console.log('Published to Redis:', { receiverId, message: newMessage });
+    // Emit directly to receiver's socket
+    const receiverSocketId = userSocketMap[receiverId];
+    if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
     res.status(201).json(newMessage);
 });
 
