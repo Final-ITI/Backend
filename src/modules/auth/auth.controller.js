@@ -86,6 +86,8 @@ export const login = asyncHandler(async (req, res) => {
     throw new ApiError("Invalid email or password", 401);
   }
 
+
+
   // Check if email is verified
   if (!user.isEmailVerified) {
     throw new ApiError("Please verify your email before logging in", 401);

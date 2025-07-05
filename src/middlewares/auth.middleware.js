@@ -31,9 +31,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     }
 
     // Check if user is active
-    if (!user.isActive) {
-      throw new ApiError("User account is deactivated", 401);
-    }
+    // if (!user.isActive) {
+    //   throw new ApiError("User account is deactivated", 401);
+    // }
 
     // Check if password was changed after token was issued
     if (user.changedPasswordAfter(decoded.iat)) {
