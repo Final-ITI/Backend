@@ -33,7 +33,6 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/onboarding", onboardingRouter);
   app.use("/api/v1/super-admin", superAdminRouter)
 
-
   app.use("/api/v1/zoom", zoomRouter);
   app.use("/api/v1/halaka", halkaRouter);
 

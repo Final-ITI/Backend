@@ -1,7 +1,6 @@
 import {  param } from "express-validator";
-import { isValidObjectId } from "../../middlewares/validation.middleware.js";
-
 import { query } from "express-validator";
+import { isValidObjectId } from "../../../middlewares/validation.middleware.js";
 
 export const getVerificationRequestsValidation = [
   query("page")
