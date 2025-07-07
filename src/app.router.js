@@ -17,7 +17,7 @@ export const appRouter = (app, express) => {
   // global middlewares
   app.use(cors());
   app.use(express.json());
-  app.use(apiRateLimiter);
+  // app.use(apiRateLimiter);
   app.use(cookieParser());
   app.get("/", (req, res) => {
     res.status(200).json({
