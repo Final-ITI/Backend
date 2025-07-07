@@ -70,32 +70,8 @@ export const createHalaka = async (req, res) => {
 
     return created(res, halaka, "Halaka created successfully");
   } catch (err) {
+    console.error("❌ Create Halaka Error:", err);
     return error(res, "Server error", 500, err);
-  }
-};
-
-export const getAllHalakat = async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.teacher) filter.teacher = req.query.teacher;
-    if (req.query.status) filter.status = req.query.status;
-
-    const halakat = await Halaka.find(filter)
-      .populate("teacher")
-      .sort({ createdAt: -1 });
-    return success(res, halakat, "Halakat fetched successfully");
-  } catch (err) {
-    return error(res, "Failed to fetch Halakat", 500, err);
-  }
-};
-
-export const getHalakaById = async (req, res) => {
-  try {
-    const halaka = await Halaka.findById(req.params.id).populate("teacher");
-    if (!halaka) return notFound(res, "Halaka not found");
-    return success(res, halaka, "Halaka fetched successfully");
-  } catch (err) {
-    return error(res, "Failed to fetch Halaka", 500, err);
   }
 };
 
@@ -127,6 +103,31 @@ export const updateHalaka = async (req, res) => {
     return success(res, halaka, "Halaka updated successfully");
   } catch (err) {
     return error(res, "Failed to update Halaka", 500, err);
+  }
+};
+
+export const getAllHalakat = async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.teacher) filter.teacher = req.query.teacher;
+    if (req.query.status) filter.status = req.query.status;
+
+    const halakat = await Halaka.find(filter)
+      .populate("teacher")
+      .sort({ createdAt: -1 });
+    return success(res, halakat, "Halakat fetched successfully");
+  } catch (err) {
+    return error(res, "Failed to fetch Halakat", 500, err);
+  }
+};
+
+export const getHalakaById = async (req, res) => {
+  try {
+    const halaka = await Halaka.findById(req.params.id).populate("teacher");
+    if (!halaka) return notFound(res, "Halaka not found");
+    return success(res, halaka, "Halaka fetched successfully");
+  } catch (err) {
+    return error(res, "Failed to fetch Halaka", 500, err);
   }
 };
 

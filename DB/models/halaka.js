@@ -62,7 +62,7 @@ const halakaSchema = new Schema(
 // Pre-save: Create Zoom meeting
 halakaSchema.pre("save", async function (next) {
   this._wasNew = this.isNew;
-  W;
+
   if (this.isNew) {
     try {
       const zoomMeeting = await createZoomMeeting({
