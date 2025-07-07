@@ -10,7 +10,6 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-
 const io = new SocketIOServer(httpServer, {
   path: "/chat",
   cors: {
@@ -22,7 +21,6 @@ const io = new SocketIOServer(httpServer, {
 connectionDB();
 appRouter(app, express);
 initSocket(io);
-
 
 const port = process.env.PORT || 4000;
 httpServer.listen(port, () => {

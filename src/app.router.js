@@ -3,6 +3,8 @@ import { apiRateLimiter } from "./middlewares/rateLimiter.js";
 import { notFoundHandler } from "./middlewares/notFound.js";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 import authRouter from "./modules/auth/auth.router.js";
+import zoomRouter from "./modules/zoom/zoom.router.js";
+import halkaRouter from "./modules/halaka/halaka.router.js";
 
 import cookieParser from "cookie-parser";
 
@@ -24,6 +26,8 @@ export const appRouter = (app, express) => {
   // Import routes
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/chat", chatRouter);
+  app.use("/api/v1/zoom", zoomRouter);
+  app.use("/api/v1/halaka", halkaRouter);
 
   // 404 handler
   app.use(notFoundHandler);
