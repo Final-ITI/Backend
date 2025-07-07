@@ -48,6 +48,8 @@ const halakaSchema = new Schema(
     zoomMeeting: {
       meetingId: String,
       password: String,
+      joinUrl: String,
+      startUrl: String,
     },
     price: { type: Number, required: true },
     status: {
