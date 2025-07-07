@@ -14,39 +14,34 @@ const documentSchema = new Schema(
       required: true,
       refPath: "ownerType",
     },
-    // user: {
-    //   type: Schema.Types.ObjectId,
-    //   required: true,
-    //   ref: "User",
-    // },
     // Document classification
-    // docType: {
-    //   type: String,
-    //   required: true,
-    //   enum: [
-    //     "student_id",
-    //     "birth_certificate",
-    //     "guardian_id",
-    //     "teaching_license",
-    //     "qualification_certificate",
-    //     "tajweed_certification",
-    //     "academy_license",
-    //     "commercial_registration",
-    //   ],
-    // },
+    docType: {
+      type: String,
+      required: true,
+      enum: [
+        // Teacher & General Docs
+        "national_id_front",
+        "national_id_back",
+        "certificates", // General term for ijazah, etc.
+        "qualification_certificate",
+
+        // Student Docs
+        "student_id",
+        "birth_certificate",
+
+        // Other types you had before
+        "guardian_id",
+        "teaching_license",
+        "tajweed_certification",
+        "academy_license",
+        "commercial_registration",
+      ],
+    },
 
     // File management
     fileUrl: { type: String, required: true },
-    fileHash: { type: String, required: true },
-
-    // national_id_front:{
-    //   url:{
-
-    //   },
-    //   id:{
-
-    //   }
-    // }
+    publicId: { type: String, required: true }, // Add this line
+    fileHash: { type: String },
 
     // Verification lifecycle (admin-controlled)
     status: {
@@ -163,8 +158,9 @@ const updateOwnerVerificationStatus = async (ownerType, ownerId) => {
   owner.verificationStatus = hasAllRequired ? "approved" : "pending";
   await owner.save();
 };
-
-export default mongoose.model("Document", documentSchema);
+const Document =
+  mongoose.models.Document || mongoose.model("Document", documentSchema);
+export default Document;
 
 /*
 

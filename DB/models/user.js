@@ -73,21 +73,6 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
-
-    // Document Verification
-    documentsUploaded: {
-      type: Boolean,
-      default: false,
-    },
-    documentsVerified: {
-      type: Boolean,
-      default: false,
-    },
-    verificationStatus: {
-      type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
-    },
     // Profile Information
     profilePicture: {
       type: String,
@@ -121,6 +106,17 @@ const userSchema = new Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    transform: function(doc, ret) {
+      // Remove sensitive fields from the output
+      ret.id = ret._id; // Add id field
+      delete ret._id;
+      delete ret.__v;
+      delete ret.password; // Do not expose password
+      delete ret.emailVerificationToken; // Do not expose verification token
+      delete ret.passwordResetToken; // Do not expose reset token
+      delete ret.lockUntil; // Do not expose lockUntil
+      return ret;
+    }
   }
 );
 

@@ -108,24 +108,24 @@ studentSchema.virtual("documents", {
 });
 
 // Auto-verification method
-studentSchema.methods.checkVerification = async function () {
-  const requiredDocs = this.requiredDocuments;
-  const approvedDocs = await mongoose.model("Document").find({
-    ownerId: this._id,
-    ownerType: "student",
-    status: "approved",
-  });
+// studentSchema.methods.checkVerification = async function () {
+//   const requiredDocs = this.requiredDocuments;
+//   const approvedDocs = await mongoose.model("Document").find({
+//     ownerId: this._id,
+//     ownerType: "student",
+//     status: "approved",
+//   });
 
-  const hasAllDocs = requiredDocs.every((rdoc) =>
-    approvedDocs.some((adoc) => adoc.docType === rdoc)
-  );
+//   const hasAllDocs = requiredDocs.every((rdoc) =>
+//     approvedDocs.some((adoc) => adoc.docType === rdoc)
+//   );
 
-  if (hasAllDocs) {
-    this.isVerified = true;
-    this.verificationStatus = "approved";
-    await this.save();
-  }
-};
+//   if (hasAllDocs) {
+//     this.isVerified = true;
+//     this.verificationStatus = "approved";
+//     await this.save();
+//   }
+// };
 
 studentSchema.virtual("isMinor").get(function () {
   return this.age < 18;
@@ -161,9 +161,9 @@ studentSchema.virtual("upcomingSessions", {
   options: { sort: { scheduledDate: 1 }, limit: 5 },
 });
 
-studentSchema.virtual("verificationStatus").get(function () {
-  return this.user.verificationStatus; // From User model
-});
+// studentSchema.virtual("verificationStatus").get(function () {
+//   return this.user.verificationStatus; // From User model
+// });
 
 // Document verification middleware
 studentSchema.pre("save", function (next) {
@@ -179,8 +179,8 @@ studentSchema.index({ user: 1 });
 studentSchema.index({ birthDate: 1 });
 studentSchema.index({ "learningGoals.targetCompletion": 1 });
 
-export default mongoose.model("Student", studentSchema);
-
+const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
+export default  Student;
 /*
  Main Fields
 user

@@ -29,13 +29,9 @@ const teacherSchema = new Schema(
       },
     ],
     // Professional Information
-    skills: {
-      type: String,
-      required: [true, "Skills is required"],
-    },
+    skills: String,
     experience: {
       type: Number,
-      required: [true, "Experience is required"],
       min: [0, "Experience cannot be negative"],
       max: [50, "Experience cannot exceed 50 years"],
     },
@@ -53,21 +49,23 @@ const teacherSchema = new Schema(
         ],
       },
     ],
+    real_gender: {
+      type: String,
+      enum: ["male", "female"],
+    },
     bio: {
       type: String,
-      required: true,
       maxlength: [500, "Bio cannot exceed 500 characters"],
     },
     id_number: {
       type: String,
-      required: true,
       maxlength: 14,
       minlength: 14,
     },
     // Pricing (for freelance teachers)
-    sessionPrice: { // private
+    sessionPrice: {
+      // private
       type: String,
-      required: true,
       min: 1,
     },
     currency: {
@@ -136,7 +134,7 @@ const teacherSchema = new Schema(
 
 // Virtual for required documents
 teacherSchema.virtual("requiredDocuments").get(function () {
-  return ["teaching_license", "qualification_certificate"];
+  return ["national_id_front", "national_id_back", "certificates"];
 });
 
 // Document relationship
@@ -147,42 +145,23 @@ teacherSchema.virtual("documents", {
   match: { ownerType: "teacher" },
 });
 
-// Auto-verification method
-teacherSchema.methods.checkVerification = async function () {
-  const requiredDocs = this.requiredDocuments;
-  const approvedDocs = await mongoose.model("Document").find({
-    ownerId: this._id,
-    ownerType: "teacher",
-    status: "approved",
-  });
-
-  const hasAllDocs = requiredDocs.every((rdoc) =>
-    approvedDocs.some((adoc) => adoc.docType === rdoc)
-  );
-
-  if (hasAllDocs) {
-    this.isVerified = true;
-    this.verificationStatus = "approved";
-    await this.save();
-  }
-};
 // Indexes for fast queries
 teacherSchema.index({ userId: 1 });
 teacherSchema.index({ academyId: 1 });
 teacherSchema.index({ teacherType: 1 });
-teacherSchema.index({ isActive: 1, isVerified: 1 });
+teacherSchema.index({ isVerified: 1 });
 teacherSchema.index({ verificationStatus: 1 });
 teacherSchema.index({ specialization: 1 });
 
 // Compound indexes for search
 teacherSchema.index({ specialization: 1, "performance.rating": -1 });
-teacherSchema.index({ isActive: 1, "performance.rating": -1 });
+// teacherSchema.index({ isActive: 1, "performance.rating": -1 });
 
 // Virtual for teacher's full profile from User
 teacherSchema.virtual("profile", {
   ref: "User",
-  localField: "userId",
-  foreignField: "_id",
+  localField: "userId", 
+  foreignField: "_id", 
   justOne: true,
 });
 
@@ -202,17 +181,9 @@ teacherSchema.virtual("studentsCount", {
   count: true,
 });
 
-// Instance method to check gender compatibility with student
-teacherSchema.methods.canTeachStudent = function (studentGender) {
-  const pref = this.teachingPreferences.preferredStudentGender;
-  if (pref === "any") return true;
-  if (pref === "same_gender_only") return true;
-  if (pref === "male_only") return studentGender === "male";
-  if (pref === "female_only") return studentGender === "female";
-  return false;
-};
-
-export default mongoose.model("Teacher", teacherSchema);
+const Teacher =
+  mongoose.models.Teacher || mongoose.model("Teacher", teacherSchema);
+export default Teacher;
 
 /*
 Core Field

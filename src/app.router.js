@@ -3,10 +3,10 @@ import { apiRateLimiter } from "./middlewares/rateLimiter.js";
 import { notFoundHandler } from "./middlewares/notFound.js";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 import authRouter from "./modules/auth/auth.router.js";
-
+import onboardingRouter from "./modules/onboarding/onboarding.router.js";
 import cookieParser from "cookie-parser";
-
 import chatRouter from "./modules/chat/chat.router.js";
+import superAdminRouter from "./modules/super-admin/super-admin.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -24,6 +24,9 @@ export const appRouter = (app, express) => {
   // Import routes
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/chat", chatRouter);
+  app.use("/api/v1/onboarding", onboardingRouter);
+  app.use("/api/v1/super-admin", superAdminRouter)
+
 
   // 404 handler
   app.use(notFoundHandler);

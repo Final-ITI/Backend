@@ -10,6 +10,7 @@ import {
   extractDeviceInfo,
   generateTokens,
 } from "../../utils/token.js";
+import Teacher from "../../../DB/models/teacher.js";
 
 export const register = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, password, gender, role, country } =
@@ -26,7 +27,7 @@ export const register = asyncHandler(async (req, res) => {
   });
 
   // Create user
-  await User.create({
+  const user = await User.create({
     firstName,
     lastName,
     email,
@@ -36,6 +37,12 @@ export const register = asyncHandler(async (req, res) => {
     userType: role,
     activationCodeEmail,
   });
+  // Check if the role is teacher
+  if(role === "teacher") {
+    await Teacher.create({
+      userId: user._id,
+    });
+  }
 
   // Send Mail
   const isSent = await EmailService.sendActivationEmail({
@@ -240,6 +247,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
   // 2. Find the valid token in the DB
   const tokenDoc = await Token.findValidToken(incomingRefreshToken, "refresh");
+
   if (!tokenDoc) {
     // This could mean the token was stolen and used. In a high-security scenario,
     // you might want to invalidate all tokens for this user.
@@ -248,6 +256,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
       403
     );
   }
+  
 
   const { user } = tokenDoc; // The user is populated from findValidToken
 

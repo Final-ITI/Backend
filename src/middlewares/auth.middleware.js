@@ -2,8 +2,12 @@ import jwt from "jsonwebtoken";
 import ApiError, { asyncHandler } from "../utils/apiError.js";
 import User from "../../DB/models/user.js";
 import Token from "../../DB/models/token.js";
+import Teacher from "../../DB/models/teacher.js";
+import Student from "../../DB/models/student.js";
 
 export const authenticate = asyncHandler(async (req, res, next) => {
+  
+  
   let token;
   const authHeader = req.headers.authorization;
 
@@ -29,12 +33,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     if (!user) {
       throw new ApiError("User not found", 401);
     }
-
-    // Check if user is active
-    // if (!user.isActive) {
-    //   throw new ApiError("User account is deactivated", 401);
-    // }
-
+    
     // Check if password was changed after token was issued
     if (user.changedPasswordAfter(decoded.iat)) {
       throw new ApiError(
@@ -72,6 +71,7 @@ export const authorize = (...roles) => {
         new ApiError(`Access denied. Required roles: ${roles.join(", ")}`, 403)
       );
     }
+    
 
     next();
   };
@@ -87,3 +87,23 @@ export const authRateLimit = {
   standardHeaders: true,
   legacyHeaders: false,
 };
+/**
+ * Middleware to attach user profile based on role
+ * This middleware checks the user's role and attaches the corresponding profile to the request object.
+ * It supports roles like 'teacher' and 'student', and can be extended for other roles
+ */
+export const attachProfileByRole = asyncHandler(async (req, res, next) => {
+  switch (req.user.userType) {
+    case "teacher":
+      req.teacher = await Teacher.findOne({ userId: req.user._id });
+      if (!req.teacher) throw new ApiError("Teacher not found", 404);
+      break;
+    case "student":
+      req.student = await Student.findOne({ userId: req.user._id });
+      if (!req.student) throw new ApiError("Student not found", 404);
+      break;
+  
+  }
+
+  next();
+});

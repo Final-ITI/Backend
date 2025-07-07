@@ -177,7 +177,6 @@ tokenSchema.statics.findValidToken = async function (token, tokenType = null) {
 
   const query = {
     token: hashedToken,
-    isActive: true,
     expiresAt: { $gt: new Date() },
     revokedAt: null,
   };
@@ -188,7 +187,7 @@ tokenSchema.statics.findValidToken = async function (token, tokenType = null) {
 
   return await this.findOne(query).populate(
     "user",
-    "firstName lastName email userType isActive"
+    "firstName lastName email userType"
   );
 };
 
