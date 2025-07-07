@@ -12,13 +12,28 @@ import {
   updateHalakaValidation,
 } from "./halaka.validation.js";
 import { validate } from "../../middlewares/validation.middleware.js";
+import { authorize } from "../../middlewares/auth.middleware.js";
 const router = express.Router();
 
-router.post("/", validate(createHalakaValidation), createHalaka);
+router.post(
+  "/",
+  authorize("teacher"),
+  validate(createHalakaValidation),
+  createHalaka
+);
 router.get("/", getAllHalakat);
 router.get("/:id", getHalakaById);
-router.put("/:id", validate(updateHalakaValidation), updateHalaka);
-router.delete("/:id", deleteHalaka);
-router.get("/teacher/:teacherId", getHalakatByTeacher);
+router.put(
+  "/:id",
+  authorize("teacher", "superadmin"),
+  validate(updateHalakaValidation),
+  updateHalaka
+);
+router.delete("/:id", authorize("teacher", "superadmin"), deleteHalaka);
+router.get(
+  "/teacher/:teacherId",
+  authorize("teacher", "admin"),
+  getHalakatByTeacher
+);
 
 export default router;
