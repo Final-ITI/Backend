@@ -33,6 +33,7 @@ Authorization: Bearer <JWT>
     "senderId": "...",
     "receiverId": "...",
     "message": "Hello!",
+    "read": false,
     "createdAt": "...",
     "updatedAt": "...",
     "__v": 0
@@ -53,6 +54,7 @@ Authorization: Bearer <JWT>
       "senderId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
       "receiverId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
       "message": "...",
+      "read": false,
       "createdAt": "...",
       "updatedAt": "...",
       "__v": 0
@@ -66,7 +68,7 @@ Authorization: Bearer <JWT>
 ### 3. Get All Conversations
 
 - **Endpoint:** `GET /api/v1/chat/conversations`
-- **Description:** Get all conversations for the current user, including the other user's info and the last message.
+- **Description:** Get all conversations for the current user, including the other user's info, the last message, and the unread message count.
 - **Response:**
   ```json
   [
@@ -78,13 +80,27 @@ Authorization: Bearer <JWT>
         "senderId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
         "receiverId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
         "message": "...",
+        "read": false,
         "createdAt": "...",
         "updatedAt": "...",
         "__v": 0
-      }
+      },
+      "unreadCount": 3
     },
     ...
   ]
+  ```
+
+---
+
+### 4. Mark Messages as Read (Unread Badge)
+
+- **Endpoint:** `POST /api/v1/chat/:id/read`
+- **Description:** Mark all messages from user `:id` to the current user as read. Use this when a user opens a chat to clear the unread badge.
+- **Request Body:** _none_
+- **Response:**
+  ```json
+  { "success": true }
   ```
 
 ---
