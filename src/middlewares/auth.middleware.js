@@ -14,7 +14,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   if (authHeader && authHeader.startsWith("Bearer ")) {
     token = authHeader.substring(7); // Remove "Bearer " prefix
   }
-
+  console.log("Token:", token);
   if (!token) {
     throw new ApiError("Access token is required", 401);
   }
@@ -61,7 +61,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
 });
 
 export const authorize = (...roles) => {
+
   return (req, res, next) => {
+    console.log("User roles:", req.user );
     if (!req.user) {
       return next(new ApiError("Authentication required", 401));
     }
