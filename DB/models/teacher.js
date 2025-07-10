@@ -29,7 +29,10 @@ const teacherSchema = new Schema(
       },
     ],
     // Professional Information
-    skills: String,
+    skills: {
+      type: String,
+    },
+
     experience: {
       type: Number,
       min: [0, "Experience cannot be negative"],
@@ -160,8 +163,8 @@ teacherSchema.index({ specialization: 1, "performance.rating": -1 });
 // Virtual for teacher's full profile from User
 teacherSchema.virtual("profile", {
   ref: "User",
-  localField: "userId", 
-  foreignField: "_id", 
+  localField: "userId",
+  foreignField: "_id",
   justOne: true,
 });
 
