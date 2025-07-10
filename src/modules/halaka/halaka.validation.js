@@ -7,12 +7,6 @@ export const createHalakaValidation = [
     .isString()
     .withMessage("Title must be a string"),
 
-  body("teacher")
-    .notEmpty()
-    .withMessage("Teacher is required")
-    .isMongoId()
-    .withMessage("Teacher must be a valid ObjectId"),
-
   body("halqaType")
     .notEmpty()
     .withMessage("halqaType is required")

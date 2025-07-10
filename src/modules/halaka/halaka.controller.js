@@ -15,7 +15,6 @@ export const createHalaka = async (req, res) => {
     const {
       title,
       description,
-      teacher,
       halqaType,
       student,
       schedule,
@@ -25,16 +24,9 @@ export const createHalaka = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (
-      !title ||
-      !teacher ||
-      !halqaType ||
-      !schedule ||
-      !curriculum ||
-      !price
-    ) {
+    if (!title || !halqaType || !schedule || !curriculum || !price) {
       return validationError(res, [
-        "Missing required fields: title, teacher, halqaType, schedule, curriculum, price",
+        "Missing required fields: title, halqaType, schedule, curriculum, price",
       ]);
     }
     if (halqaType === "private" && !student) {
@@ -43,12 +35,18 @@ export const createHalaka = async (req, res) => {
     if (halqaType === "halqa" && !maxStudents) {
       return validationError(res, ["maxStudents is required for group halaka"]);
     }
+    console.log(req.user);
+
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found ", 403);
+    }
 
     // Prepare data
     const halakaData = {
       title,
       description,
-      teacher,
+      teacher: teacher._id,
       halqaType,
       schedule,
       curriculum,
@@ -77,6 +75,17 @@ export const createHalaka = async (req, res) => {
 
 export const updateHalaka = async (req, res) => {
   try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka) return notFound(res, "Halaka not found");
+
     const allowedFields = [
       "title",
       "description",
@@ -86,20 +95,11 @@ export const updateHalaka = async (req, res) => {
       "price",
       "status",
     ];
-    const updateData = {};
     for (const key of allowedFields) {
-      if (req.body[key] !== undefined) updateData[key] = req.body[key];
+      if (req.body[key] !== undefined) halaka[key] = req.body[key];
     }
 
-    if (Object.keys(updateData).length === 0) {
-      return validationError(res, ["No valid fields provided for update"]);
-    }
-
-    const halaka = await Halaka.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true,
-    });
-    if (!halaka) return notFound(res, "Halaka not found");
+    await halaka.save();
     return success(res, halaka, "Halaka updated successfully");
   } catch (err) {
     return error(res, "Failed to update Halaka", 500, err);
@@ -123,8 +123,16 @@ export const getAllHalakat = async (req, res) => {
 
 export const getHalakaById = async (req, res) => {
   try {
-    const halaka = await Halaka.findById(req.params.id).populate("teacher");
-    if (!halaka) return notFound(res, "Halaka not found");
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    }).populate("teacher");
+    if (!halaka) return notFound(res, "Halaka not found or not yours");
     return success(res, halaka, "Halaka fetched successfully");
   } catch (err) {
     return error(res, "Failed to fetch Halaka", 500, err);
@@ -133,18 +141,21 @@ export const getHalakaById = async (req, res) => {
 
 export const deleteHalaka = async (req, res) => {
   try {
-    const halaka = await Halaka.findById(req.params.id);
-    if (!halaka) return notFound(res, "Halaka not found");
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
 
-    // 1. Delete all sessions related to this Halaka
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka) return notFound(res, "Halaka not found or not yours");
+
     await Session.deleteMany({ halaka: halaka._id });
-    console.log("sessions deleted successfully");
-    // 2. Remove Halaka ID from teacher's halakat array
     await Teacher.findByIdAndUpdate(halaka.teacher, {
       $pull: { halakat: halaka._id },
     });
-    console.log("teacher's halakat updated successfully");
-    // 3. Delete the Halaka itself
     await halaka.deleteOne();
 
     return success(
@@ -159,7 +170,12 @@ export const deleteHalaka = async (req, res) => {
 
 export const getHalakatByTeacher = async (req, res) => {
   try {
-    const halakat = await Halaka.find({ teacher: req.params.teacherId })
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halakat = await Halaka.find({ teacher: teacher._id })
       .populate("teacher")
       .sort({ createdAt: -1 });
     return success(res, halakat, "Halakat fetched successfully");
