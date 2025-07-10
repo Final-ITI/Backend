@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Conversation from "../../../DB/models/conversation.js";
 import Message from "../../../DB/models/message.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
@@ -112,12 +113,20 @@ export const getConversations = asyncHandler(async (req, res) => {
 });
 
 export const markAsRead = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { id: otherUserId } = req.params;
-    // Mark all messages from otherUserId to userId as read
-    await Message.updateMany(
-        { senderId: otherUserId, receiverId: userId, read: false },
-        { $set: { read: true } }
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+    const otherUserId = new mongoose.Types.ObjectId(req.params.id);
+  
+    const result = await Message.updateMany(
+      {
+        senderId: otherUserId,
+        receiverId: userId,
+        read: false,
+      },
+      { $set: { read: true } }
     );
-    res.status(200).json({ success: true });
-}); 
+  
+    console.log("markAsRead result:", result);
+    res.status(200).json({ success: true, modifiedCount: result.modifiedCount });
+  });
+  
+  
