@@ -12,7 +12,9 @@ import {
   updateHalakaValidation,
 } from "./halaka.validation.js";
 import { validate } from "../../middlewares/validation.middleware.js";
+
 import { authorize, authenticate } from "../../middlewares/auth.middleware.js";
+
 const router = express.Router();
 
 router.post(

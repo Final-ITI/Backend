@@ -33,6 +33,7 @@ Authorization: Bearer <JWT>
     "senderId": "...",
     "receiverId": "...",
     "message": "Hello!",
+    "read": false,
     "createdAt": "...",
     "updatedAt": "...",
     "__v": 0
@@ -53,6 +54,7 @@ Authorization: Bearer <JWT>
       "senderId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
       "receiverId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
       "message": "...",
+      "read": false,
       "createdAt": "...",
       "updatedAt": "...",
       "__v": 0
@@ -66,7 +68,7 @@ Authorization: Bearer <JWT>
 ### 3. Get All Conversations
 
 - **Endpoint:** `GET /api/v1/chat/conversations`
-- **Description:** Get all conversations for the current user, including the other user's info and the last message.
+- **Description:** Get all conversations for the current user, including the other user's info, the last message, and the unread message count.
 - **Response:**
   ```json
   [
@@ -78,14 +80,42 @@ Authorization: Bearer <JWT>
         "senderId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
         "receiverId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
         "message": "...",
+        "read": false,
         "createdAt": "...",
         "updatedAt": "...",
         "__v": 0
-      }
+      },
+      "unreadCount": 3
     },
     ...
   ]
   ```
+
+---
+
+### 4. Mark Messages as Read (Unread Badge)
+
+- **Endpoint:** `POST /api/v1/chat/:id/read`
+- **Description:**
+  - Marks all messages in the conversation **from user `:id` to the current user** as read.
+  - This endpoint should be called when the user opens a chat window with another user, indicating that all previously unread messages from that user have now been seen.
+  - After calling this endpoint, the unread badge for that conversation will be cleared (set to 0) for the current user.
+- **When to Call:**
+  - Call this endpoint as soon as the user navigates to or opens a chat with another user (e.g., when the chat window becomes active or visible).
+  - You do **not** need to call it for every message; one call per chat open is enough.
+- **Request Body:** _none_
+- **Response:**
+  ```json
+  { "success": true }
+  ```
+- **Usage Scenario:**
+  1. User sees a badge (e.g., "3") on a conversation in the chat list, indicating 3 unread messages.
+  2. User clicks the conversation to open the chat window.
+  3. Frontend immediately calls `POST /api/v1/chat/:id/read` (where `:id` is the other user's ID).
+  4. The backend marks all messages from that user to the current user as read.
+  5. The unread badge disappears (or is set to 0) in the UI.
+- **Effect:**
+  - The next time you call `GET /api/v1/chat/conversations`, the `unreadCount` for that conversation will be 0 (until new messages arrive).
 
 ---
 

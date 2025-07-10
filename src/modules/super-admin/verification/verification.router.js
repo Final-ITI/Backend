@@ -5,8 +5,8 @@ import {
 import { validate } from "../../../middlewares/validation.middleware.js";
 
 import { Router } from "express";
-import { getVerificationRequests } from "./verification.controller.js";
-import { getVerificationRequestsValidation  } from "./verification.validation.js";
+import {  getTeacherVerificationDetails, getVerificationRequests, reviewDocument,  updateTeacherVerificationStatus } from "./verification.controller.js";
+import { getVerificationRequestsValidation,  updateTeacherVerificationStatusValidation,  validateDocumentId,  validateTeacherId  } from "./verification.validation.js";
 
 const router = Router();
 router.use(authenticate, authorize("superadmin"));
@@ -17,6 +17,11 @@ router.get(
   getVerificationRequests
 );
 
-// router.get('/:teacherId',validate(validateId), )
+router.get('/:teacherId',validate(validateTeacherId), getTeacherVerificationDetails);
+
+router.post('/documents/:documentId/review', validate(validateDocumentId), reviewDocument);
+ // Update teacher verification status
+router.patch('/:teacherId/status', validate(updateTeacherVerificationStatusValidation), updateTeacherVerificationStatus);
+
 
 export default router;
