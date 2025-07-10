@@ -78,27 +78,46 @@ export const getConversations = asyncHandler(async (req, res) => {
         })
         .populate({
             path: "message",
-            options: { sort: { createdAt: -1 } },
+            options: { sort: { createdAt: 1 } }, // oldest to newest
             populate: [
                 { path: "senderId", select: "firstName lastName profilePicture" },
                 { path: "receiverId", select: "firstName lastName profilePicture" }
             ]
         });
 
-    // Format the response: for each conversation, return the other user and the last message
-    const result = conversations.map(conv => {
+    // Format the response: for each conversation, return the other user, the last message, and unread count
+    const result = await Promise.all(conversations.map(async conv => {
         // Get the other participant
         const otherUser = conv.participants.find(p => p._id.toString() !== userId.toString());
         // Get the last message (most recent)
         const lastMessage = Array.isArray(conv.message) && conv.message.length > 0
             ? conv.message[conv.message.length - 1]
             : null;
+        // Count unread messages for this conversation
+        let unreadCount = 0;
+        if (conv.message && conv.message.length > 0) {
+            unreadCount = conv.message.filter(
+                m => m.receiverId && m.receiverId._id && m.receiverId._id.toString() === userId.toString() && !m.read
+            ).length;
+        }
         return {
             conversationId: conv._id,
             user: otherUser,
-            lastMessage
+            lastMessage,
+            unreadCount
         };
-    });
+    }));
 
     res.status(200).json(result);
+});
+
+export const markAsRead = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { id: otherUserId } = req.params;
+    // Mark all messages from otherUserId to userId as read
+    await Message.updateMany(
+        { senderId: otherUserId, receiverId: userId, read: false },
+        { $set: { read: true } }
+    );
+    res.status(200).json({ success: true });
 }); 
