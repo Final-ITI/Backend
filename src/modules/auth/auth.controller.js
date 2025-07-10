@@ -38,7 +38,7 @@ export const register = asyncHandler(async (req, res) => {
     activationCodeEmail,
   });
   // Check if the role is teacher
-  if(role === "teacher") {
+  if (role === "teacher") {
     await Teacher.create({
       userId: user._id,
     });
@@ -220,22 +220,24 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
-    const refreshToken = req.cookies.refreshToken;
+  const refreshToken = req.cookies.refreshToken;
 
-    if (refreshToken) {
-        // Revoke the token in the database, ignoring if it fails (e.g., already invalid)
-        await Token.revokeToken(refreshToken, "user_logout", req.user?._id).catch(() => {});
-    }
+  if (refreshToken) {
+    // Revoke the token in the database, ignoring if it fails (e.g., already invalid)
+    await Token.revokeToken(refreshToken, "user_logout", req.user?._id).catch(
+      () => {}
+    );
+  }
 
-    // Clear the cookie on the client side
-    res.cookie('refreshToken', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        expires: new Date(0) // Set expiry to a past date to delete it
-    });
+  // Clear the cookie on the client side
+  res.cookie("refreshToken", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    expires: new Date(0), // Set expiry to a past date to delete it
+  });
 
-    success(res, null, "Logged out successfully");
+  success(res, null, "Logged out successfully");
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
@@ -256,7 +258,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
       403
     );
   }
-  
 
   const { user } = tokenDoc; // The user is populated from findValidToken
 

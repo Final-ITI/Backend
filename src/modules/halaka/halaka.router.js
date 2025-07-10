@@ -12,7 +12,9 @@ import {
   updateHalakaValidation,
 } from "./halaka.validation.js";
 import { validate } from "../../middlewares/validation.middleware.js";
-import { authenticate, authorize } from "../../middlewares/auth.middleware.js";
+
+import { authorize, authenticate } from "../../middlewares/auth.middleware.js";
+
 const router = express.Router();
 
 router.post(
@@ -22,20 +24,20 @@ router.post(
   validate(createHalakaValidation),
   createHalaka
 );
-router.get("/", getAllHalakat);
-router.get("/:id", getHalakaById);
+router.get("/", authenticate, authorize("teacher"), getAllHalakat);
+router.get("/:id", authenticate, authorize("teacher"), getHalakaById);
 router.put(
   "/:id",
   authenticate,
-  authorize("teacher", "superadmin"),
+  authorize("teacher"),
   validate(updateHalakaValidation),
   updateHalaka
 );
-router.delete("/:id", authenticate,authorize("teacher", "superadmin"), deleteHalaka);
+router.delete("/:id", authenticate, authorize("teacher"), deleteHalaka);
 router.get(
   "/teacher/:teacherId",
   authenticate,
-  authorize("teacher", "admin"),
+  authorize("teacher"),
   getHalakatByTeacher
 );
 
