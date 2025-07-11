@@ -1,7 +1,8 @@
 import Document from "../../../DB/models/document.js";
 import Teacher from "../../../DB/models/teacher.js";
+import { processIdCardWithGemini } from "../../services/gemini.service.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
-import { created, success } from "../../utils/apiResponse.js";
+import { created, success } from "../../utils/apiResponse.js"; 
 import { cloudinary, uploadToCloud } from "../../utils/cloud.js";
 
 export const profile = asyncHandler(async (req, res) => {
@@ -53,7 +54,6 @@ export const uploadMyDocument = asyncHandler(async (req, res, next) => {
     return next(new ApiError("Teacher profile not found for this user.", 404));
   }
 
-
   // 3. Upload the original file buffer to the cloud
   const uploadResult = await uploadToCloud(req.file.buffer, {
     folder: `motqan/teachers/${teacher._id}/verification_documents`, // Use teacher._id
@@ -73,6 +73,23 @@ export const uploadMyDocument = asyncHandler(async (req, res, next) => {
     publicId: uploadResult.public_id,
     fileHash: uploadResult.etag,
   });
+
+
+  if (docType === 'national_id_front') {
+    console.log("Processing National ID front image for teacher:", teacher._id);
+    const ocrResult = await processIdCardWithGemini(req.file.buffer); 
+    console.log(`AI Result for teacher ${teacher._id}:`, ocrResult);
+
+    if (ocrResult && ocrResult.nationalId) {
+        teacher.id_number = ocrResult.nationalId;
+        // You can also compare ocrResult.name with the name in the DB
+        await teacher.save();
+        console.log(`AI Success: Found National ID ${ocrResult.nationalId} for teacher ${teacher._id}`);
+    } else {
+        console.warn(`AI Warning: Could not find National ID for teacher ${teacher._id}`);
+    }
+}
+// 
 
   // 5. Send a success response back to the client
   success(res, newDocument, "Document uploaded successfully.");
