@@ -1,8 +1,8 @@
 import Document from "../../../DB/models/document.js";
 import Teacher from "../../../DB/models/teacher.js";
-import { processIdCardWithGemini } from "../../services/gemini.service.js";
+import { processIdCardSide } from "../../services/gemini.service.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
-import { created, success } from "../../utils/apiResponse.js"; 
+import { created, success } from "../../utils/apiResponse.js";
 import { cloudinary, uploadToCloud } from "../../utils/cloud.js";
 
 export const profile = asyncHandler(async (req, res) => {
@@ -21,7 +21,24 @@ export const profile = asyncHandler(async (req, res) => {
   if (skills) teacher.skills = skills;
   if (experience) teacher.experience = experience;
   if (sessionPrice) teacher.sessionPrice = sessionPrice;
-  if (id_number) teacher.id_number = id_number;
+  if (id_number) {
+    const isIdNumberChanged =
+      teacher.id_number !== id_number &&
+      teacher.id_number !== teacher.ai?.id_number;
+
+    if (isIdNumberChanged) {
+      const existingIdNumber = await Teacher.findOne({ id_number });
+
+      if (existingIdNumber) {
+        throw new ApiError(
+          "This ID number is already used by another teacher.",
+          400
+        );
+      }
+    }
+
+    teacher.id_number = id_number;
+  }
 
   // 4. check if id number is male or female
   const real_gender =
@@ -34,29 +51,33 @@ export const profile = asyncHandler(async (req, res) => {
   // 5. Save the updated teacher profile
   const updatedTeacher = await teacher.save();
 
+  // Remove sensitive fields from response
+  const { bankingInfo, performance, halakat, ...responseTeacher } =
+    updatedTeacher.toObject();
+
   // 5. Return the updated profile
-  created(res, updatedTeacher, "Profile updated successfully.");
+  created(res, responseTeacher, "Profile updated successfully.");
 });
 
 export const uploadMyDocument = asyncHandler(async (req, res, next) => {
-  // 1. Validate the request
+  // --- Step 1: Validate Incoming Request ---
   if (!req.file) {
-    return next(new ApiError("No file was uploaded", 400));
+    return next(new ApiError("No file was uploaded.", 400));
   }
   const { docType } = req.body;
   if (!docType) {
     return next(new ApiError('The "docType" field is required.', 400));
   }
 
-  // 2. Find the teacher profile using the logged-in user's ID
+  // --- Step 2: Find the Associated Teacher Profile ---
   const teacher = await Teacher.findOne({ userId: req.user._id });
   if (!teacher) {
     return next(new ApiError("Teacher profile not found for this user.", 404));
   }
 
-  // 3. Upload the original file buffer to the cloud
+  // --- Step 3: Upload File to Cloud Storage (e.g., Cloudinary) ---
   const uploadResult = await uploadToCloud(req.file.buffer, {
-    folder: `motqan/teachers/${teacher._id}/verification_documents`, // Use teacher._id
+    folder: `motqan/teachers/${teacher._id}/verification_documents`,
     resource_type: "auto",
   });
 
@@ -64,35 +85,111 @@ export const uploadMyDocument = asyncHandler(async (req, res, next) => {
     return next(new ApiError("Failed to upload file to the cloud.", 500));
   }
 
-  // 4. Create a new document record in the database
+  // --- Step 4: Create Document Record in Database ---
   const newDocument = await Document.create({
     ownerType: "teacher",
-    ownerId: teacher._id, // Use teacher._id
+    ownerId: teacher._id,
     docType: docType,
     fileUrl: uploadResult.secure_url,
     publicId: uploadResult.public_id,
     fileHash: uploadResult.etag,
   });
 
+  // --- Step 5: Send IMMEDIATE Success Response to User ---
+  // The user should not wait for the AI processing.
+  success(
+    res,
+    newDocument,
+    "Document uploaded successfully. Analysis is in progress."
+  );
 
-  if (docType === 'national_id_front') {
-    console.log("Processing National ID front image for teacher:", teacher._id);
-    const ocrResult = await processIdCardWithGemini(req.file.buffer); 
-    console.log(`AI Result for teacher ${teacher._id}:`, ocrResult);
+  // --- Step 6: Trigger AI Processing in the Background ---
+  // We do this AFTER sending the response.
+  // We wrap it in a function and call it without 'await'.
+  const runAiProcessing = async () => {
+    try {
+      if (docType === "national_id_front" || docType === "national_id_back") {
+        const side = docType === "national_id_front" ? "front" : "back";
+        const aiResult = await processIdCardSide(req.file.buffer, side);
 
-    if (ocrResult && ocrResult.nationalId) {
-        teacher.id_number = ocrResult.nationalId;
-        // You can also compare ocrResult.name with the name in the DB
-        await teacher.save();
-        console.log(`AI Success: Found National ID ${ocrResult.nationalId} for teacher ${teacher._id}`);
-    } else {
-        console.warn(`AI Warning: Could not find National ID for teacher ${teacher._id}`);
+        console.log(`AI Result for [${side}]:`, aiResult);
+
+        if (aiResult) {
+          // Prepare updates for the document's ai subdocument
+          const aiUpdates = {};
+          if (aiResult.nationalId)
+            aiUpdates["ai.id_number"] = aiResult.nationalId;
+          if (aiResult.fullName) aiUpdates["ai.fullName"] = aiResult.fullName;
+          if (aiResult.address) aiUpdates["ai.address"] = aiResult.address;
+          if (aiResult.gender) aiUpdates["ai.gender"] = aiResult.gender;
+          if (aiResult.expiryDate) {
+            aiUpdates["ai.expiryDate"] = aiResult.expiryDate;
+
+            // Validate if the ID has expired
+            const expiryDate = new Date(aiResult.expiryDate);
+            const currentDate = new Date();
+
+            if (expiryDate < currentDate) {
+              aiUpdates["ai.isExpired"] = true;
+              console.log(
+                `National ID expired for teacher ${teacher._id}. Expiry date: ${aiResult.expiryDate}`
+              );
+            } else {
+              aiUpdates["ai.isExpired"] = false;
+            }
+          }
+
+          // --- NEW LOGIC: Auto-reject if nationalId does not match profile ---
+          if (
+            aiResult.nationalId &&
+            aiResult.nationalId !== teacher.id_number
+          ) {
+            // Auto-reject the document
+            await Document.updateOne(
+              { _id: newDocument._id },
+              {
+                $set: {
+                  ...aiUpdates,
+                  status: "rejected",
+                  rejectionReason: "National ID does not match profile.",
+                  reviewDate: new Date(),
+                  reviewer: null, // Optionally set to a system user if you have one
+                },
+              }
+            );
+            console.log(
+              `Document ${newDocument._id} auto-rejected: National ID does not match profile.`
+            );
+            return; // Stop further processing
+          }
+
+          // --- END NEW LOGIC ---
+
+          // Update the document record in one go (if not rejected)
+          if (Object.keys(aiUpdates).length > 0) {
+            console.log("%%%%%%%%%%%%%%%%%%%%%%%%%%");
+            const data = await Document.updateOne(
+              { _id: newDocument._id },
+              { $set: aiUpdates }
+            );
+            console.log(
+              `AI data updated for document ${newDocument._id}:`,
+              data
+            );
+          }
+        }
+      }
+    } catch (error) {
+      // Log the error but don't crash the server.
+      // The main request has already succeeded.
+      console.error(
+        `BACKGROUND AI ERROR for teacher ${teacher._id}:`,
+        error.message
+      );
     }
-}
-// 
+  };
 
-  // 5. Send a success response back to the client
-  success(res, newDocument, "Document uploaded successfully.");
+  runAiProcessing(); // Run the function without await
 });
 
 export const deleteMyDocument = asyncHandler(async (req, res) => {

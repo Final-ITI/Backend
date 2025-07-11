@@ -42,7 +42,31 @@ const documentSchema = new Schema(
     fileUrl: { type: String, required: true },
     publicId: { type: String, required: true }, // Add this line
     fileHash: { type: String },
-
+    // AI processing results
+    ai: {
+      fullName: {
+        type: String,
+      },
+      id_number: {
+        type: String,
+        unique: true,
+        maxlength: 14,
+        minlength: 14,
+      },
+      gender: {
+        type: String,
+        enum: ["male", "female", "ذكر", "أنثى"],
+      },
+      expiryDate: {
+        type: Date,
+      },
+      isExpired: {
+        type: Boolean,
+      },
+      address: {
+        type: String,
+      },
+    },
     // Verification lifecycle (admin-controlled)
     status: {
       type: String,

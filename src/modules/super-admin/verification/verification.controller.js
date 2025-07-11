@@ -162,6 +162,7 @@ export const getTeacherVerificationDetails = asyncHandler(async (req, res) => {
       status: doc.status,
       fileUrl: doc.fileUrl,
       createdAt: doc.createdAt,
+      ai: doc.ai,
     })),
   };
 
@@ -173,10 +174,15 @@ export const reviewDocument = asyncHandler(async (req, res) => {
   const { action } = req.body;
 
   if (!["approve", "reject"].includes(action)) {
-    throw new ApiError("الإجراء غير صالح، يجب أن يكون 'approve' أو 'reject'", 400);
+    throw new ApiError(
+      "الإجراء غير صالح، يجب أن يكون 'approve' أو 'reject'",
+      400
+    );
   }
 
-  const document = await Document.findById(documentId).select("status reviewDate reviewer");
+  const document = await Document.findById(documentId).select(
+    "status reviewDate reviewer"
+  );
   if (!document) throw new ApiError("Document not found", 404);
 
   if (document.status !== "pending") {
@@ -188,51 +194,62 @@ export const reviewDocument = asyncHandler(async (req, res) => {
   document.reviewer = req.user._id;
   await document.save();
 
-  const message = action === "approve"
-    ? "تمت الموافقة على المستند بنجاح."
-    : "تم رفض المستند بنجاح.";
+  const message =
+    action === "approve"
+      ? "تمت الموافقة على المستند بنجاح."
+      : "تم رفض المستند بنجاح.";
 
   success(res, document, message);
 });
 
-export const updateTeacherVerificationStatus = asyncHandler(async (req, res) => {
-  const { teacherId } = req.params;
-  const { action } = req.body;
+export const updateTeacherVerificationStatus = asyncHandler(
+  async (req, res) => {
+    const { teacherId } = req.params;
+    const { action } = req.body;
 
-  if (!["approve", "reject"].includes(action)) {
-    throw new ApiError("الإجراء غير صالح، يجب أن يكون 'approve' أو 'reject'", 400);
-  }
-
-  // Find the teacher
-  const teacher = await Teacher.findById(teacherId);
-  if (!teacher) throw new ApiError("Teacher not found", 404);
-
-  if (teacher.verificationStatus !== "pending") {
-    throw new ApiError("Teacher verification is not pending", 400);
-  }
-
-  // Update all teacher's documents
-  const documentStatus = action === "approve" ? "approved" : "rejected";
-  await Document.updateMany(
-    { 
-      ownerId: teacherId,
-      ownerType: "teacher",
-      status: "pending"
-    },
-    {
-      status: documentStatus,
-      reviewDate: new Date(),
-      reviewer: req.user._id
+    if (!["approve", "reject"].includes(action)) {
+      throw new ApiError(
+        "الإجراء غير صالح، يجب أن يكون 'approve' أو 'reject'",
+        400
+      );
     }
-  );
 
-  // Update teacher's verification status
-  teacher.verificationStatus = action === "approve" ? "approved" : "rejected";
-  await teacher.save();
+    // Find the teacher
+    const teacher = await Teacher.findById(teacherId);
+    if (!teacher) throw new ApiError("Teacher not found", 404);
 
-  const message = action === "approve"
-    ? "تمت الموافقة على جميع مستندات المعلم بنجاح."
-    : "تم رفض جميع مستندات المعلم بنجاح.";
+    if (teacher.verificationStatus !== "pending") {
+      throw new ApiError("Teacher verification is not pending", 400);
+    }
 
-  success(res, { teacherId, verificationStatus: teacher.verificationStatus }, message);
-});
+    // Update all teacher's documents
+    const documentStatus = action === "approve" ? "approved" : "rejected";
+    await Document.updateMany(
+      {
+        ownerId: teacherId,
+        ownerType: "teacher",
+        status: "pending",
+      },
+      {
+        status: documentStatus,
+        reviewDate: new Date(),
+        reviewer: req.user._id,
+      }
+    );
+
+    // Update teacher's verification status
+    teacher.verificationStatus = action === "approve" ? "approved" : "rejected";
+    await teacher.save();
+
+    const message =
+      action === "approve"
+        ? "تمت الموافقة على جميع مستندات المعلم بنجاح."
+        : "تم رفض جميع مستندات المعلم بنجاح.";
+
+    success(
+      res,
+      { teacherId, verificationStatus: teacher.verificationStatus },
+      message
+    );
+  }
+);

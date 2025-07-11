@@ -42,3 +42,26 @@ export const uploadToCloud = (fileBuffer, options = {}) => {
     });
 };
 
+
+/**
+ * Uploads a file buffer to cloud storage with organized folder structure
+ * @async
+ * @function _uploadFileToCloud
+ * @param {Buffer} fileBuffer - The file data as a buffer to be uploaded
+ * @param {string} ownerId - The unique identifier of the file owner
+ * @param {string} [ownerType="teacher"] - The type of owner (e.g., "teacher", "student")
+ * @param {string} [fileType="documents"] - The category/type of file being uploaded
+ * @returns {Promise<Object>} The upload result object containing secure_url and other metadata
+ * @description Creates a structured folder path in format: motqan/{ownerType}s/{ownerId}/{fileType}
+ * and uploads the file with auto-detected resource type
+ */
+export async function _uploadFileToCloud(fileBuffer, ownerId, ownerType = "teacher", fileType = "documents") {
+    const uploadResult = await uploadToCloud(fileBuffer, {
+        folder: `motqan/${ownerType}s/${ownerId}/${fileType}`,
+        resource_type: "auto",
+    });
+    if (!uploadResult || !uploadResult.secure_url) {
+        throw new ApiError("Failed to upload file to the cloud.", 500);
+    }
+    return uploadResult;
+}

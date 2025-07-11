@@ -54,14 +54,16 @@ const teacherSchema = new Schema(
     ],
     real_gender: {
       type: String,
-      enum: ["male", "female"],
+      enum: ["male", "female", "ذكر", "أنثى"],
     },
     bio: {
       type: String,
       maxlength: [500, "Bio cannot exceed 500 characters"],
     },
+    // national ID
     id_number: {
       type: String,
+      unique: true,
       maxlength: 14,
       minlength: 14,
     },
