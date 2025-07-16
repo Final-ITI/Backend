@@ -147,6 +147,42 @@ Authorization: Bearer <JWT>
 
 ---
 
+## Real-Time Notifications for Chat
+
+When a user receives a new chat message, the backend emits a real-time `notification` event to the receiver's socket. This allows the frontend to show a notification badge, popup, or toast in the UI (e.g., on the "المحادثات" menu).
+
+- **Event:** `notification`
+- **Payload Example:**
+  ```json
+  {
+    "type": "chat",
+    "message": "لديك رسالة جديدة",
+    "from": "<senderUserId>",
+    "conversationId": "<conversationId>",
+    "messageId": "<newMessageId>"
+  }
+  ```
+- **Frontend Usage Example (JS):**
+  ```js
+  socket.on("notification", (data) => {
+    // Example: Show a badge or toast
+    // data.type === "chat"
+    // data.message: notification text (e.g., "لديك رسالة جديدة")
+    // data.from: sender user ID
+    // data.conversationId: conversation ID
+    // data.messageId: new message ID
+    showChatNotification(data);
+    // Optionally increment unread badge for the conversation
+    incrementUnreadBadge(data.conversationId);
+  });
+  ```
+- **Typical UI Behaviors:**
+  - Show a badge on the "المحادثات" (Chats) menu when a new message arrives.
+  - Optionally show a popup or toast with the notification message.
+  - When the user opens the chat, call the mark-as-read endpoint to clear the badge.
+
+---
+
 ## Why Document the Real-Time (Socket.IO) Connection?
 
 1. **Clarity for Frontend Developers:**

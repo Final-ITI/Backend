@@ -36,6 +36,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
     const receiverSocketId = userSocketMap[receiverId];
     if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
+        // Emit a notification event as well
+        io.to(receiverSocketId).emit("notification", {
+            type: "chat",
+            message: "لديك رسالة جديدة",
+            from: senderId,
+            conversationId: conversation._id,
+            messageId: newMessage._id
+        });
     }
 
     res.status(201).json(newMessage);
@@ -115,18 +123,17 @@ export const getConversations = asyncHandler(async (req, res) => {
 export const markAsRead = asyncHandler(async (req, res) => {
     const userId = new mongoose.Types.ObjectId(req.user._id);
     const otherUserId = new mongoose.Types.ObjectId(req.params.id);
-  
+
     const result = await Message.updateMany(
-      {
-        senderId: otherUserId,
-        receiverId: userId,
-        read: false,
-      },
-      { $set: { read: true } }
+        {
+            senderId: otherUserId,
+            receiverId: userId,
+            read: false,
+        },
+        { $set: { read: true } }
     );
-  
+
     console.log("markAsRead result:", result);
     res.status(200).json({ success: true, modifiedCount: result.modifiedCount });
-  });
-  
-  
+});
+
