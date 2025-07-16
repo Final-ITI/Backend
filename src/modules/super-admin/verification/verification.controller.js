@@ -132,7 +132,6 @@ export const getTeacherVerificationDetails = asyncHandler(async (req, res) => {
     .lean();
 
   if (!teacher) throw new ApiError("Teacher not found", 404);
-  console.log();
 
   // Transform the response to match the required structure
   const transformedResponse = {

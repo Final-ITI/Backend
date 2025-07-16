@@ -85,7 +85,7 @@ export const documentUploadValidation = [
       "national_id_back",
       "birth_certificate",
       "guardian_id",
-      "teacher_certificate",
+      "certificates",
       "other",
     ])
     .withMessage(
