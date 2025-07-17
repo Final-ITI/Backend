@@ -205,3 +205,23 @@ export const getUpcomingSessions = async (req, res) => {
   });
   return success(res, sessionsWithStatus, "Next session list");
 };
+
+//attendance
+export const getHalakaAttendance = async (req, res) => {
+  try {
+    const halaka = await Halaka.findById(req.params.id).populate(
+      "attendance.records.student",
+      "user"
+    );
+    if (!halaka) return notFound(res, "Halaka not found");
+
+    let attendance = halaka.attendance;
+    if (req.query.date)
+      attendance = attendance.filter(
+        (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
+      );
+    return success(res, attendance, "Attendance data fetched");
+  } catch (err) {
+    return error(res, "Failed to fetch attendance", 500, err);
+  }
+};

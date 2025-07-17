@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import "./session.js";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
 
@@ -57,6 +56,23 @@ const halakaSchema = new Schema(
       enum: ["scheduled", "active", "completed", "cancelled"],
       default: "scheduled",
     },
+    attendance: [
+      {
+        sessionDate: Date,
+        records: [
+          {
+            student: { type: Schema.Types.ObjectId, ref: "Student" },
+            status: {
+              type: String,
+              enum: ["present", "absent", "late", "excused"],
+              default: "present",
+            },
+            timeIn: Date,
+            timeOut: Date,
+          },
+        ],
+      },
+    ],
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

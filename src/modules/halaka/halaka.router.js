@@ -7,6 +7,7 @@ import {
   deleteHalaka,
   getHalakatByTeacher,
   getUpcomingSessions,
+  getHalakaAttendance,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -50,4 +51,11 @@ router.get(
   getUpcomingSessions
 );
 
+//attendance
+router.get(
+  "/:id/attendance",
+  authenticate,
+  authorize("teacher"),
+  getHalakaAttendance
+);
 export default router;

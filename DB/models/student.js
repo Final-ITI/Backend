@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 const studentSchema = new Schema(
   {
     // Reference to base User (required)
-    user: {
+    userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -14,19 +14,19 @@ const studentSchema = new Schema(
     // Student-specific fields
     birthDate: {
       type: Date,
-      required: true,
+      // required: true,
     },
     guardianName: {
       type: String,
-      required: function () {
-        return this.isMinor();
-      },
+      // required: function () {
+      //   return this.isMinor();
+      // },
     },
     guardianPhone: {
       type: String,
-      required: function () {
-        return this.isMinor();
-      },
+      // required: function () {
+      //   return this.isMinor();
+      // },
       match: [
         /^[+]?[0-9\s\-\(\)]{10,15}$/,
         "Please provide a valid phone number",
@@ -36,13 +36,13 @@ const studentSchema = new Schema(
     // Document verification (complements User docs)
     studentIdDocument: {
       type: String, // File path or URL
-      required: true,
+      // required: true,
     },
     guardianIdDocument: {
       type: String, // File path or URL
-      required: function () {
-        return this.isMinor();
-      },
+      // required: function () {
+      //   return this.isMinor();
+      // },
     },
 
     // Academic progress
@@ -87,10 +87,10 @@ const studentSchema = new Schema(
 );
 
 // Virtual for age calculation
-studentSchema.virtual("age").get(function () {
-  const diff = Date.now() - this.birthDate.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-});
+// studentSchema.virtual("age").get(function () {
+//   const diff = Date.now() - this.birthDate.getTime();
+//   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+// });
 
 // Virtual for required documents
 studentSchema.virtual("requiredDocuments").get(function () {
@@ -179,8 +179,9 @@ studentSchema.index({ user: 1 });
 studentSchema.index({ birthDate: 1 });
 studentSchema.index({ "learningGoals.targetCompletion": 1 });
 
-const Student = mongoose.models.Student || mongoose.model("Student", studentSchema);
-export default  Student;
+const Student =
+  mongoose.models.Student || mongoose.model("Student", studentSchema);
+export default Student;
 /*
  Main Fields
 user
