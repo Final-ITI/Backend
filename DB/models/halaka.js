@@ -11,6 +11,7 @@ const halakaSchema = new Schema(
     description: String,
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
     student: { type: Schema.Types.ObjectId, ref: "Student" },
+    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group
     halqaType: { type: String, required: true, enum: ["private", "halqa"] },
     schedule: {
       frequency: {

@@ -10,7 +10,7 @@ export const sendContactForm = async (req, res) => {
     }
     try {
         const sent = await sendEmail({
-            to: "support@example.com", 
+            to: "abdalla862002@gmail.com", 
             subject: `[Contact Form] ${subject}`,
             message: `From: ${fullname} <${email}>\n\n${message}`,
             html: `<p><strong>From:</strong> ${fullname} (${email})</p><p><strong>Subject:</strong> ${subject}</p><p>${message}</p>`

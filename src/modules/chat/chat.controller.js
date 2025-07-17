@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import Conversation from "../../../DB/models/conversation.js";
 import Message from "../../../DB/models/message.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
-import { userSocketMap, io } from "../../socket/socket.js";
+import { userSocketMap, io, emitGroupMessage } from "../../socket/socket.js";
+import ChatGroup from "../../../DB/models/chatGroup.js";
 
 export const sendMessage = asyncHandler(async (req, res) => {
     const { message } = req.body;
@@ -135,5 +136,79 @@ export const markAsRead = asyncHandler(async (req, res) => {
 
     console.log("markAsRead result:", result);
     res.status(200).json({ success: true, modifiedCount: result.modifiedCount });
+});
+
+export const sendGroupMessage = asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    const { groupId } = req.params;
+    const senderId = req.user._id;
+
+    if (!message || !groupId) {
+        throw new ApiError("Message content and group ID are required", 400);
+    }
+
+    const chatGroup = await ChatGroup.findById(groupId);
+    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup.participants.map(id => id.toString()).includes(senderId.toString())) {
+        throw new ApiError("You are not a participant in this group", 403);
+    }
+
+    let conversation = await Conversation.findOne({ chatGroup: groupId });
+    if (!conversation) {
+        conversation = await Conversation.create({
+            participants: chatGroup.participants,
+            chatGroup: groupId,
+        });
+    }
+
+    const newMessage = new Message({
+        senderId,
+        message,
+    });
+    conversation.message.push(newMessage._id);
+    await Promise.all([conversation.save(), newMessage.save()]);
+
+    // Emit to all group participants in real time
+    emitGroupMessage(groupId, "groupMessage", {
+        message: newMessage,
+        groupId,
+    });
+
+    res.status(201).json(newMessage);
+});
+
+export const getGroupMessages = asyncHandler(async (req, res) => {
+    const { groupId } = req.params;
+    const userId = req.user._id;
+
+    const chatGroup = await ChatGroup.findById(groupId);
+    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup.participants.map(id => id.toString()).includes(userId.toString())) {
+        throw new ApiError("You are not a participant in this group", 403);
+    }
+
+    const conversation = await Conversation.findOne({ chatGroup: groupId }).populate({
+        path: "message",
+        populate: [
+            { path: "senderId", select: "firstName lastName profilePicture" },
+            { path: "receiverId", select: "firstName lastName profilePicture" }
+        ]
+    });
+    if (!conversation) return res.status(200).json([]);
+    res.status(200).json(conversation.message);
+});
+
+export const getGroupInfo = asyncHandler(async (req, res) => {
+    const { groupId } = req.params;
+    const userId = req.user._id;
+    const chatGroup = await ChatGroup.findById(groupId).populate({
+        path: "participants",
+        select: "firstName lastName profilePicture"
+    });
+    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup.participants.map(p => p._id.toString()).includes(userId.toString())) {
+        throw new ApiError("You are not a participant in this group", 403);
+    }
+    res.status(200).json(chatGroup);
 });
 
