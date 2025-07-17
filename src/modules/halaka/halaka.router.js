@@ -6,6 +6,8 @@ import {
   updateHalaka,
   deleteHalaka,
   getHalakatByTeacher,
+  getUpcomingSessions,
+  getHalakaAttendance,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -41,4 +43,19 @@ router.get(
   getHalakatByTeacher
 );
 
+// Endpoint to get upcoming sessions for a specific Halaka
+router.get(
+  "/:id/next-sessions",
+  authenticate,
+  authorize("teacher"),
+  getUpcomingSessions
+);
+
+//attendance
+router.get(
+  "/:id/attendance",
+  authenticate,
+  authorize("teacher"),
+  getHalakaAttendance
+);
 export default router;

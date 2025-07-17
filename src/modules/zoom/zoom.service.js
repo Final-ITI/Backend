@@ -21,21 +21,24 @@ export async function createZoomMeeting({
   duration,
   timezone,
   password,
+  recurrence,
 }) {
   const token = await getAccessToken();
   const meetingData = {
     topic,
-    type: 2,
+    type: 8, // 8 = Recurring meeting with fixed time
     start_time,
     duration,
     timezone,
     password,
+    recurrence, // (pattern for all sessions)
     settings: {
       join_before_host: true,
+      waiting_room: false,
       mute_upon_entry: true,
-      waiting_room: true,
     },
   };
+
   const response = await axios.post(
     "https://api.zoom.us/v2/users/me/meetings",
     meetingData,
@@ -50,8 +53,9 @@ export async function createZoomMeeting({
   return {
     meetingId: response.data.id,
     password: response.data.password,
-    join_url: response.data.join_url,
+    joinUrl: response.data.join_url,
     startUrl: response.data.start_url,
+    settings: response.data.settings,
   };
 }
 

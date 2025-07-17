@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import "./session.js";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
 
@@ -58,6 +57,23 @@ const halakaSchema = new Schema(
       enum: ["scheduled", "active", "completed", "cancelled"],
       default: "scheduled",
     },
+    attendance: [
+      {
+        sessionDate: Date,
+        records: [
+          {
+            student: { type: Schema.Types.ObjectId, ref: "Student" },
+            status: {
+              type: String,
+              enum: ["present", "absent", "late", "excused"],
+              default: "present",
+            },
+            timeIn: Date,
+            timeOut: Date,
+          },
+        ],
+      },
+    ],
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
@@ -65,15 +81,17 @@ const halakaSchema = new Schema(
 // Pre-save: Create Zoom meeting
 halakaSchema.pre("save", async function (next) {
   this._wasNew = this.isNew;
-
   if (this.isNew) {
     try {
+      // Generate recurrence object based on schedule
+      const recurrence = getRecurrenceFromSchedule(this.schedule);
       const zoomMeeting = await createZoomMeeting({
         topic: this.title,
         start_time: this.schedule.startDate.toISOString(),
         duration: this.schedule.duration,
         timezone: this.schedule.timezone,
         password: Math.random().toString(36).slice(-8),
+        recurrence,
       });
       this.zoomMeeting = zoomMeeting;
     } catch (error) {
@@ -85,51 +103,116 @@ halakaSchema.pre("save", async function (next) {
 });
 
 // Post-save: Generate sessions
+// halakaSchema.post("save", async function (doc) {
+//   if (doc._wasNew) {
+//     try {
+//       const Session = mongoose.model("Session");
+//       const sessions = [];
+//       let currentDate = new Date(doc.schedule.startDate);
+//       const endDate = new Date(doc.schedule.endDate);
+
+//       await Session.deleteMany({ halaka: doc._id });
+
+//       while (currentDate <= endDate) {
+//         const dayName = currentDate
+//           .toLocaleString("en-US", { weekday: "long" })
+//           .toLowerCase();
+
+//         if (doc.schedule.days.includes(dayName)) {
+//           sessions.push({
+//             halaka: doc._id,
+//             teacher: doc.teacher,
+//             scheduledDate: new Date(currentDate),
+//             scheduledStartTime: doc.schedule.startTime,
+//             scheduledEndTime: calculateEndTime(
+//               doc.schedule.startTime,
+//               doc.schedule.duration
+//             ),
+//             zoomMeeting: doc.zoomMeeting,
+//           });
+//         }
+
+//         currentDate.setDate(currentDate.getDate() + 1);
+//       }
+
+//       if (sessions.length > 0) {
+//         await Session.insertMany(sessions);
+//       }
+
+//       await mongoose.model("Teacher").findByIdAndUpdate(
+//         doc.teacher,
+//         { $addToSet: { halakat: doc._id } } // $addToSet prevents duplicates
+//       );
+//     } catch (error) {
+//       console.error("❌ Error generating sessions:", error);
+//     }
+//   }
+// });
+
 halakaSchema.post("save", async function (doc) {
   if (doc._wasNew) {
     try {
-      const Session = mongoose.model("Session");
-      const sessions = [];
-      let currentDate = new Date(doc.schedule.startDate);
-      const endDate = new Date(doc.schedule.endDate);
-
-      await Session.deleteMany({ halaka: doc._id });
-
-      while (currentDate <= endDate) {
-        const dayName = currentDate
-          .toLocaleString("en-US", { weekday: "long" })
-          .toLowerCase();
-
-        if (doc.schedule.days.includes(dayName)) {
-          sessions.push({
-            halaka: doc._id,
-            teacher: doc.teacher,
-            scheduledDate: new Date(currentDate),
-            scheduledStartTime: doc.schedule.startTime,
-            scheduledEndTime: calculateEndTime(
-              doc.schedule.startTime,
-              doc.schedule.duration
-            ),
-            zoomMeeting: doc.zoomMeeting,
-          });
-        }
-
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      if (sessions.length > 0) {
-        await Session.insertMany(sessions);
-      }
-
       await mongoose.model("Teacher").findByIdAndUpdate(
         doc.teacher,
         { $addToSet: { halakat: doc._id } } // $addToSet prevents duplicates
       );
     } catch (error) {
-      console.error("❌ Error generating sessions:", error);
+      console.error("❌ Error updating teacher's halakat:", error);
     }
   }
 });
+
+halakaSchema.methods.getUpcomingSessions = function (
+  count = 5,
+  fromDate = new Date()
+) {
+  const sessions = [];
+  let currentDate = new Date(fromDate);
+  const endDate = new Date(this.schedule.endDate);
+  let added = 0;
+
+  // Loop until you've found as many as requested or reach end date
+  while (currentDate <= endDate && added < count) {
+    const dayName = currentDate
+      .toLocaleString("en-US", { weekday: "long" })
+      .toLowerCase();
+    if (
+      this.schedule.days.includes(dayName) &&
+      currentDate >= new Date(this.schedule.startDate)
+    ) {
+      sessions.push({
+        scheduledDate: new Date(currentDate),
+        scheduledStartTime: this.schedule.startTime,
+        scheduledEndTime: calculateEndTime(
+          this.schedule.startTime,
+          this.schedule.duration
+        ),
+        zoomMeeting: this.zoomMeeting,
+      });
+      added += 1;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return sessions;
+};
+
+function getRecurrenceFromSchedule(schedule) {
+  const daysMap = {
+    sunday: 1,
+    monday: 2,
+    tuesday: 3,
+    wednesday: 4,
+    thursday: 5,
+    friday: 6,
+    saturday: 7,
+  };
+  return {
+    type: 2, // for weekly recurrence
+    repeat_interval: 1,
+    weekly_days: schedule.days.map((day) => daysMap[day]).join(","),
+    end_date_time: schedule.endDate.toISOString(), // expects a Date
+  };
+}
 
 function calculateEndTime(startTime, duration) {
   const [hours, minutes] = startTime.split(":").map(Number);

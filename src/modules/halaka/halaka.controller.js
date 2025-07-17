@@ -201,3 +201,45 @@ export const getHalakatByTeacher = async (req, res) => {
     return error(res, "Failed to fetch Halakat", 500, err);
   }
 };
+
+//session
+// Get upcoming sessions for a specific Halaka
+export const getUpcomingSessions = async (req, res) => {
+  const halaka = await Halaka.findById(req.params.id);
+  if (!halaka) return notFound(res, "Halaka not found");
+  const sessions = halaka.getUpcomingSessions(5);
+  const now = new Date();
+  const sessionsWithStatus = sessions.map((session) => {
+    const start = new Date(
+      session.scheduledDate + "T" + session.scheduledStartTime
+    );
+    const end = new Date(
+      session.scheduledDate + "T" + session.scheduledEndTime
+    );
+    let status = "scheduled";
+    if (now >= start && now <= end) status = "in-progress";
+    if (now > end) status = "completed";
+    return { ...session, status };
+  });
+  return success(res, sessionsWithStatus, "Next session list");
+};
+
+//attendance
+export const getHalakaAttendance = async (req, res) => {
+  try {
+    const halaka = await Halaka.findById(req.params.id).populate(
+      "attendance.records.student",
+      "user"
+    );
+    if (!halaka) return notFound(res, "Halaka not found");
+
+    let attendance = halaka.attendance;
+    if (req.query.date)
+      attendance = attendance.filter(
+        (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
+      );
+    return success(res, attendance, "Attendance data fetched");
+  } catch (err) {
+    return error(res, "Failed to fetch attendance", 500, err);
+  }
+};
