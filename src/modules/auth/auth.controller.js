@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { EmailService, AuthMailService } from "../../services/email.service.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
 import User from "../../../DB/models/user.js";
+import Student from "../../../DB/models/student.js";
 import Token from "../../../DB/models/token.js";
 import { created, success, error, notFound } from "../../utils/apiResponse.js";
 import {
@@ -40,6 +41,10 @@ export const register = asyncHandler(async (req, res) => {
   // Check if the role is teacher
   if (role === "teacher") {
     await Teacher.create({
+      userId: user._id,
+    });
+  } else if (role === "student") {
+    await Student.create({
       userId: user._id,
     });
   }
