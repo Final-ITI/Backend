@@ -9,7 +9,8 @@ import halkaRouter from "./modules/halaka/halaka.router.js";
 import cookieParser from "cookie-parser";
 import chatRouter from "./modules/chat/chat.router.js";
 import superAdminRouter from "./modules/super-admin/super-admin.router.js";
-import teacherRouter from "./modules/teacher/teacher.router.js"
+import teacherRouter from "./modules/teacher/teacher.router.js";
+import contactRouter from "./modules/contact/contact.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -27,6 +28,7 @@ export const appRouter = (app, express) => {
   // Import routes
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/chat", chatRouter);
+  app.use("/api", contactRouter);
 
   app.use("/api/v1/onboarding", onboardingRouter);
   app.use("/api/v1/super-admin", superAdminRouter)
