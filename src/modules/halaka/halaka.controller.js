@@ -9,6 +9,24 @@ import {
 import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
 
+// --- ENROLLMENT CHATGROUP INTEGRATION (Uncomment when Enrollment is implemented) ---
+/*
+import ChatGroup from "../../../DB/models/chatGroup.js";
+import Student from "../../../DB/models/student.js";
+import Halaka from "../../../DB/models/halaka.js";
+
+// After successful enrollment:
+// const halaka = await Halaka.findById(halakaId);
+// const chatGroup = await ChatGroup.findById(halaka.chatGroup);
+// const studentDoc = await Student.findById(studentId).populate("user");
+// if (studentDoc && studentDoc.user) {
+//   if (!chatGroup.participants.includes(studentDoc.user._id)) {
+//     chatGroup.participants.push(studentDoc.user._id);
+//     await chatGroup.save();
+//   }
+// }
+*/
+// --- END ENROLLMENT CHATGROUP INTEGRATION ---
 //teacher
 export const createHalaka = async (req, res) => {
   try {

@@ -14,7 +14,7 @@ const enrollmentSchema = new Schema(
     payment: {
       paymentId: String,
       amount: Number,
-      currency: { type: String, default: "SAR" },
+      currency: { type: String, default: "EGP" },
       status: {
         type: String,
         enum: ["pending", "paid", "failed"],

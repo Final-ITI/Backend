@@ -15,6 +15,11 @@ const conversationSchema = new mongoose.Schema(
         ref: "Message",
       },
     ],
+    chatGroup: {
+      type: mongoose.Schema.ObjectId,
+      ref: "ChatGroup",
+      default: null,
+    }, // New: link to ChatGroup for group chat
   },
   { timestamps: true }
 );
