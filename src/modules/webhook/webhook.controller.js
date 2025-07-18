@@ -38,6 +38,7 @@ async function upsertAttendance({
 
 export const zoomAttendanceWebhook = async (req, res) => {
   try {
+    // 1. Handle validation challenge and exit early
     if (req.body.event === "endpoint.url_validation") {
       const plainToken = req.body.payload.plainToken;
       const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
@@ -45,12 +46,15 @@ export const zoomAttendanceWebhook = async (req, res) => {
         .createHmac("sha256", secret)
         .update(plainToken)
         .digest("hex");
+      // Do not run any other logic for validation events
       return res.status(200).json({ plainToken, encryptedToken });
     }
 
+    // 2. All remaining code is ONLY for proper webhook events
     const { event, payload } = req.body;
     const meetingId = payload?.object?.id;
     const participant = payload?.object?.participant;
+
     const eventTime =
       participant?.join_time || participant?.leave_time || new Date();
 
@@ -61,11 +65,10 @@ export const zoomAttendanceWebhook = async (req, res) => {
     const user = await User.findOne({ email: participant?.email });
     if (!user) return notFound(res, "User email not found", 404);
 
-    // 2. Lookup Student by user._id
+    // Use userId field as defined in your schema
     const student = await Student.findOne({ userId: user._id });
     if (!student) return notFound(res, "Student not found for this email", 404);
 
-    // Get sessionDate (YYYY-MM-DD string)
     const sessionDate = new Date(eventTime).toISOString().slice(0, 10);
 
     if (event === "meeting.participant_joined") {
