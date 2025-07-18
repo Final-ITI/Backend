@@ -57,7 +57,7 @@ export const getVerificationRequests = asyncHandler(async (req, res) => {
 
   // Build the populated query
   features.query = features.query
-    .select("createdAt verificationStatus userId ")
+    .select("createdAt verificationStatus userId isVerified")
     .populate({
       path: "userId",
       select: "_id firstName lastName email profilePicture userType",
@@ -238,6 +238,7 @@ export const updateTeacherVerificationStatus = asyncHandler(
 
     // Update teacher's verification status
     teacher.verificationStatus = action === "approve" ? "approved" : "rejected";
+    teacher.isVerified = action === "approve";
     await teacher.save();
 
     const message =
