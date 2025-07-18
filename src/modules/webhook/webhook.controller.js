@@ -52,11 +52,15 @@ export const zoomAttendanceWebhook = async (req, res) => {
 
     // 2. All remaining code is ONLY for proper webhook events
     const { event, payload } = req.body;
-    const meetingId = payload?.object?.id;
     const participant = payload?.object?.participant;
 
-    const eventTime =
-      participant?.join_time || participant?.leave_time || new Date();
+    let eventTime;
+    if (event === "meeting.participant_joined") {
+      eventTime = participant?.join_time;
+    } else if (event === "meeting.participant_left") {
+      eventTime = participant?.leave_time;
+    }
+    if (!eventTime) eventTime = new Date().toISOString();
 
     // Find halaka
     const halaka = await Halaka.findOne({ "zoomMeeting.meetingId": meetingId });
