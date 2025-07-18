@@ -227,10 +227,13 @@ export const getUpcomingSessions = async (req, res) => {
 //attendance
 export const getHalakaAttendance = async (req, res) => {
   try {
-    const halaka = await Halaka.findById(req.params.id).populate(
-      "attendance.records.student",
-      "user"
-    );
+    const halaka = await Halaka.findById(req.params.id).populate({
+      path: "attendance.records.student",
+      populate: {
+        path: "userId",
+        select: "firstName lastName email _id",
+      },
+    });
     if (!halaka) return notFound(res, "Halaka not found");
 
     let attendance = halaka.attendance;
@@ -238,7 +241,29 @@ export const getHalakaAttendance = async (req, res) => {
       attendance = attendance.filter(
         (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
       );
-    return success(res, attendance, "Attendance data fetched");
+
+    // Format each record for name and student ID
+    const formatted = attendance.map((a) => ({
+      sessionDate: a.sessionDate,
+      records: a.records.map((r) => {
+        const stu = r.student;
+        return stu && stu.userId
+          ? {
+              student: {
+                id: stu._id,
+                firstName: stu.userId.firstName,
+                lastName: stu.userId.lastName,
+                email: stu.userId.email,
+              },
+              status: r.status,
+              timeIn: r.timeIn,
+              timeOut: r.timeOut,
+            }
+          : null;
+      }),
+    }));
+
+    return success(res, formatted, "Attendance data fetched");
   } catch (err) {
     return error(res, "Failed to fetch attendance", 500, err);
   }
