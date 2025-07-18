@@ -17,6 +17,7 @@ async function upsertAttendance({
     (e) => e.sessionDate.toISOString().slice(0, 10) === sessionDate.slice(0, 10)
   );
   if (!entry) {
+    console.log("creating entity for date", sessionDate);
     entry = { sessionDate: new Date(sessionDate), records: [] };
     halaka.attendance.push(entry);
   }
@@ -53,6 +54,7 @@ export const zoomAttendanceWebhook = async (req, res) => {
     // 2. All remaining code is ONLY for proper webhook events
     const { event, payload } = req.body;
     const participant = payload?.object?.participant;
+    const meetingId = payload?.object?.id;
 
     let eventTime;
     if (event === "meeting.participant_joined") {
