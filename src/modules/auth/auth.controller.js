@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import { EmailService, AuthMailService } from "../../services/email.service.js";
 import ApiError, { asyncHandler } from "../../utils/apiError.js";
 import User from "../../../DB/models/user.js";
-import Student from "../../../DB/models/student.js";
 import Token from "../../../DB/models/token.js";
 import { created, success, error, notFound } from "../../utils/apiResponse.js";
 import {
@@ -12,10 +11,10 @@ import {
   generateTokens,
 } from "../../utils/token.js";
 import Teacher from "../../../DB/models/teacher.js";
+import Student from "../../../DB/models/student.js";
 
 export const register = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, password, gender, role, country } =
-    req.body;
+  const { firstName, lastName, email, password, gender, role, country } = req.body;
   // Check Email
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -38,15 +37,16 @@ export const register = asyncHandler(async (req, res) => {
     userType: role,
     activationCodeEmail,
   });
-  // Check if the role is teacher
-  if (role === "teacher") {
-    await Teacher.create({
+
+  // Create associated model
+  if (role === "student") {
+    console.log("Creating student profile for user:", user._id);
+    const student = await Student.create({
       userId: user._id,
     });
-  } else if (role === "student") {
-    await Student.create({
-      userId: user._id,
-    });
+    console.log("Student profile created:", student);
+  } else if (role === "teacher") {
+    await Teacher.create({ userId: user._id });
   }
 
   // Send Mail

@@ -159,6 +159,30 @@ userSchema.pre("save", function (next) {
   next();
 });
 
+// Post-save middleware to create Teacher or Student records
+userSchema.post("save", async function (doc) {
+  // Only create profile records for new users
+  if (doc.isNew !== false) {
+    try {
+      if (doc.userType === "teacher") {
+        const Teacher = mongoose.model("Teacher");
+        await Teacher.create({
+          userId: doc._id,
+        });
+      } else if (doc.userType === "student") {
+        const Student = mongoose.model("Student");
+        await Student.create({
+          user: doc._id,
+          profileCompleted: false, // Will require profile completion later
+        });
+      }
+    } catch (error) {
+      throw new Error(`Error creating ${doc.userType} profile: ${error.message}`);
+    }
+  }
+});
+
+
 // Instance method to check password
 userSchema.methods.correctPassword = async function (
   candidatePassword,
@@ -202,150 +226,3 @@ userSchema.methods.incLoginAttempts = function () {
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;
-
-/*
-
-Basic Information
-firstName, lastName: Required for personalization and identification.
-
-email: Required, unique, validated. Used for login, notifications, and as a unique identifier.
-
-password: Required, hashed, hidden in queries. Used for authentication.
-
-phone: Required, validated. Used for contact and notifications.
-
-User Type and Role
-userType: Required, enum. Controls access and permissions (superadmin, academy, teacher, student).
-
-gender: Required, enum. Ensures gender-based access as per cultural requirements.
-
-Address Information
-address: Simple string. Used for contact or verification.
-
-country: Defaults to "Saudi Arabia". Used for localization.
-
-Account Status
-isActive: Default true. Used to deactivate users if needed.
-
-isVerified: Default false. Indicates if user is verified by admin.
-
-isEmailVerified: Default false. Indicates if email is verified.
-
-Document Verification
-documentsUploaded: Default false. Indicates if user uploaded documents.
-
-documentsVerified: Default false. Indicates if documents are verified by admin.
-
-verificationStatus: Enum (pending, approved, rejected). Tracks document review status.
-
-Profile Information
-profilePicture: Optional. Used for user profile.
-
-bio: Optional, maxlength 500. Short user description.
-
-Authentication & Security
-emailVerificationToken, emailVerificationExpires: Used for email verification.
-
-passwordResetToken, passwordResetExpires: Used for password reset.
-
-passwordChangedAt: Tracks password changes for security.
-
-loginAttempts: Tracks failed login attempts.
-
-lockUntil: Locks account after too many failed attempts.
-
-Multi-tenant Support
-tenantId: References Academy. Used to link users to their academy (null for superadmin and freelancers).
-
-Timestamps
-lastLogin: Tracks last login time.
-
-timestamps: true: Adds createdAt and updatedAt automatically.
-
-
-
-_______________
-Indexes:
-_______________
-{ email: 1 }	Fast lookup by email (login, uniqueness check)
-{ userType: 1 }	Fast filtering by user type (e.g., list all teachers)
-{ tenantId: 1, userType: 1 }	Fast filtering by academy and user type (e.g., all students in academy)
-{ verificationStatus: 1 }	Fast filtering by verification status (e.g., pending approvals)
-{ isActive: 1, isVerified: 1 }	Fast filtering by active/verified users
-
-_______________
- Virtuals
-_______________
-fullName: Combines firstName and lastName for display.
-
-isLocked: Checks if account is locked due to failed login attempts.
-
-_______________
-Methods
-_______________
-pre-save middleware: Hashes password before saving.
-
-correctPassword: Checks if password matches.
-
-changedPasswordAfter: Checks if password changed after JWT was issued (for security).
-
-incLoginAttempts: Handles login attempts and locks account after too many failures.
-
-
-
-
-
-
-_____________
-User Flow
-_____________
-1. Registration
-User fills in basic info (name, email, phone, password, gender, address).
-
-Selects user type (superadmin, academy, teacher, student).
-
-Uploads documents if required (e.g., ID, license).
-
-Account is created with default statuses (isActive: true, isVerified: false, documentsUploaded: false, verificationStatus: pending).
-
-2. Verification
-Admin reviews documents and updates verificationStatus.
-
-If approved: isVerified and documentsVerified are set to true.
-
-If rejected: User is notified to re-upload documents.
-
-3. Login
-User logs in with email and password.
-
-Login attempts are tracked.
-
-If too many failures, account is locked for 2 hours.
-
-4. Profile Management
-User can update profile info (bio, profile picture).
-
-Can change password (triggers passwordChangedAt).
-
-5. Password Reset
-User requests password reset.
-
-Reset token is generated and sent to email.
-
-User resets password using token.
-
-6. Multi-tenancy
-If user is academy, teacher, or student, tenantId links to their academy.
-
-Superadmin and freelance teachers have tenantId as null.
-
-7. Account Status
-Admin can deactivate user (isActive: false).
-
-User can be locked out for security reasons.
-
-
-
-
-
-*/
