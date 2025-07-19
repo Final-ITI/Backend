@@ -25,12 +25,20 @@ export const createHalaka = async (req, res) => {
       price,
     } = req.body;
 
-    // Validation
+    // Basic validation first
     if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
         "Missing required fields: title, halqaType, schedule, curriculum",
       ]);
     }
+
+    // Get teacher BEFORE validation that uses teacher data
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    // Now you can safely validate using teacher data
     if (halqaType === "private" && !teacher.sessionPrice) {
       return validationError(res, ["Teacher does not have a sessionPrice set"]);
     }
@@ -39,11 +47,6 @@ export const createHalaka = async (req, res) => {
     }
     if (halqaType === "halqa" && !maxStudents) {
       return validationError(res, ["maxStudents is required for group halaka"]);
-    }
-
-    const teacher = await Teacher.findOne({ userId: req.user._id });
-    if (!teacher) {
-      return error(res, "Teacher not found ", 403);
     }
 
     const halakaData = {
@@ -70,6 +73,7 @@ export const createHalaka = async (req, res) => {
     // Save Halaka
     let halaka = new Halaka(halakaData);
     await halaka.save();
+
     // For group halaka, create a ChatGroup and assign it
     if (halqaType === "halqa") {
       // Get the teacher's userId

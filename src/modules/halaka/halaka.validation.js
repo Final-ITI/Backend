@@ -53,12 +53,6 @@ export const createHalakaValidation = [
     .isIn(["quran_memorization", "tajweed", "arabic", "islamic_studies"])
     .withMessage("Invalid curriculum type"),
 
-  body("price")
-    .notEmpty()
-    .withMessage("Price is required")
-    .isFloat({ min: 0 })
-    .withMessage("Price must be a positive number"),
-
   // Conditional validation for group halaka
   body("maxStudents")
     .if(body("halqaType").equals("halqa"))
