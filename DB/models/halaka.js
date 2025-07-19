@@ -115,7 +115,7 @@ halakaSchema.post("save", async function (doc) {
     try {
       await mongoose.model("Teacher").findByIdAndUpdate(
         doc.teacher,
-        { $addToSet: { halakat: doc._id } } // $addToSet prevents duplicates
+        { $addToSet: { halakat: doc._id } } 
       );
     } catch (error) {
       console.error("❌ Error updating teacher's halakat:", error);
