@@ -26,7 +26,7 @@ router.post(
   validate(createHalakaValidation),
   createHalaka
 );
-router.get("/", authenticate, authorize("teacher"), getAllHalakat);
+router.get("/", getAllHalakat);
 router.get("/:id", authenticate, authorize("teacher"), getHalakaById);
 router.put(
   "/:id",

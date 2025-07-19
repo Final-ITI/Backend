@@ -8,7 +8,8 @@ import {
 } from "../../utils/apiResponse.js";
 import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
-
+import { paginated } from "../../utils/apiResponse.js";
+import User from "../../../DB/models/user.js";
 
 //teacher
 export const createHalaka = async (req, res) => {
@@ -78,7 +79,8 @@ export const createHalaka = async (req, res) => {
         teacherUserId = teacherDoc.userId._id;
       }
       if (teacherUserId) {
-        const ChatGroup = (await import("../../../DB/models/chatGroup.js")).default;
+        const ChatGroup = (await import("../../../DB/models/chatGroup.js"))
+          .default;
         const chatGroup = await ChatGroup.create({
           halaka: halaka._id,
           participants: [teacherUserId],
@@ -131,21 +133,6 @@ export const updateHalaka = async (req, res) => {
   }
 };
 
-export const getAllHalakat = async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.teacher) filter.teacher = req.query.teacher;
-    if (req.query.status) filter.status = req.query.status;
-
-    const halakat = await Halaka.find(filter)
-      .populate("teacher")
-      .sort({ createdAt: -1 });
-    return success(res, halakat, "Halakat fetched successfully");
-  } catch (err) {
-    return error(res, "Failed to fetch Halakat", 500, err);
-  }
-};
-
 export const getHalakaById = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
@@ -156,7 +143,7 @@ export const getHalakaById = async (req, res) => {
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
-    }).populate("teacher");
+    });
     if (!halaka) return notFound(res, "Halaka not found or not yours");
     return success(res, halaka, "Halaka fetched successfully");
   } catch (err) {
@@ -200,9 +187,9 @@ export const getHalakatByTeacher = async (req, res) => {
       return error(res, "Teacher not found", 403);
     }
 
-    const halakat = await Halaka.find({ teacher: teacher._id })
-      .populate("teacher")
-      .sort({ createdAt: -1 });
+    const halakat = await Halaka.find({ teacher: teacher._id }).sort({
+      createdAt: -1,
+    });
     return success(res, halakat, "Halakat fetched successfully");
   } catch (err) {
     return error(res, "Failed to fetch Halakat", 500, err);
@@ -232,6 +219,7 @@ export const getUpcomingSessions = async (req, res) => {
 };
 
 //attendance
+// Get attendance records for a specific Halaka
 export const getHalakaAttendance = async (req, res) => {
   try {
     const halaka = await Halaka.findById(req.params.id).populate({
@@ -256,16 +244,16 @@ export const getHalakaAttendance = async (req, res) => {
         const stu = r.student;
         return stu && stu.userId
           ? {
-            student: {
-              id: stu._id,
-              firstName: stu.userId.firstName,
-              lastName: stu.userId.lastName,
-              email: stu.userId.email,
-            },
-            status: r.status,
-            timeIn: r.timeIn,
-            timeOut: r.timeOut,
-          }
+              student: {
+                id: stu._id,
+                firstName: stu.userId.firstName,
+                lastName: stu.userId.lastName,
+                email: stu.userId.email,
+              },
+              status: r.status,
+              timeIn: r.timeIn,
+              timeOut: r.timeOut,
+            }
           : null;
       }),
     }));
@@ -273,5 +261,97 @@ export const getHalakaAttendance = async (req, res) => {
     return success(res, formatted, "Attendance data fetched");
   } catch (err) {
     return error(res, "Failed to fetch attendance", 500, err);
+  }
+};
+
+//get all halakat in system filtered by teacher, title, status, curriculum
+export const getAllHalakat = async (req, res) => {
+  try {
+    const filter = {};
+    // 1. Build filters from query
+    if (req.query.title)
+      filter.title = { $regex: req.query.title, $options: "i" };
+    if (req.query.curriculum) filter.curriculum = req.query.curriculum;
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.teacher) filter.teacher = req.query.teacher;
+
+    // 2. For teacherName, search teachers first and filter by their IDs
+    if (req.query.teacherName) {
+      const nameParts = req.query.teacherName.trim().split(/\s+/);
+      let userQuery;
+
+      if (nameParts.length === 1) {
+        // Old logic: single word, search both first and last name
+        userQuery = {
+          $or: [
+            { firstName: { $regex: nameParts[0], $options: "i" } },
+            { lastName: { $regex: nameParts[0], $options: "i" } },
+          ],
+        };
+      } else if (nameParts.length >= 2) {
+        // Multi-word: try all combinations!
+        userQuery = {
+          $or: [
+            // first: "nesma", last: "fayed"
+            {
+              firstName: { $regex: nameParts[0], $options: "i" },
+              lastName: { $regex: nameParts.slice(1).join(" "), $options: "i" },
+            },
+            // first: "fayed", last: "nesma"
+            {
+              firstName: {
+                $regex: nameParts.slice(1).join(" "),
+                $options: "i",
+              },
+              lastName: { $regex: nameParts[0], $options: "i" },
+            },
+            // fallback: either field contains full string
+            { firstName: { $regex: req.query.teacherName, $options: "i" } },
+            { lastName: { $regex: req.query.teacherName, $options: "i" } },
+          ],
+        };
+      }
+
+      // Lookup users with this query
+      const users = await User.find(userQuery);
+      const userIds = users.map((u) => u._id);
+
+      const teachers = await Teacher.find({ userId: { $in: userIds } });
+      const teacherIds = teachers.map((t) => t._id);
+
+      filter.teacher = { $in: teacherIds };
+    }
+
+    // 3. Handle pagination params
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // 4. Get total count for pagination
+    const totalItems = await Halaka.countDocuments(filter);
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 5. Query data (AND POPULATE TEACHER!)
+    const halakat = await Halaka.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("teacher");
+
+    // 6. Prepare pagination info
+    const paginationInfo = {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    // 7. Respond using standardized paginated response
+    return paginated(res, halakat, paginationInfo);
+  } catch (err) {
+    console.log(err);
+    return error(res, "Failed to fetch Halakat", 500, err);
   }
 };
