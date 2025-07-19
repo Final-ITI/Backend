@@ -12,6 +12,7 @@ import superAdminRouter from "./modules/super-admin/super-admin.router.js";
 import teacherRouter from "./modules/teacher/teacher.router.js";
 import contactRouter from "./modules/contact/contact.router.js";
 import webhookRouter from "./modules/webhook/webhook.router.js";
+import enrollmentRouter from "./modules/enrollment/enrollment.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -38,6 +39,7 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/halaka", halkaRouter);
   app.use("/api/v1/teacher", teacherRouter);
   app.use("/api/v1/webhook", webhookRouter);
+  app.use("/api/v1/enrollments", enrollmentRouter); 
 
   // 404 handler
   app.use(notFoundHandler);
