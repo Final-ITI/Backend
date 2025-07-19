@@ -52,6 +52,8 @@ const halakaSchema = new Schema(
       startUrl: String,
     },
     price: { type: Number, required: true },
+    totalSessions: { type: Number },
+    totalPrice: { type: Number },
     status: {
       type: String,
       enum: ["scheduled", "active", "completed", "cancelled"],
@@ -83,6 +85,12 @@ halakaSchema.pre("save", async function (next) {
   this._wasNew = this.isNew;
   if (this.isNew) {
     try {
+      // Calculate total sessions and price if schedule and price are set
+      if (this.schedule && this.price) {
+        const sessions = countAllSessions(this.schedule);
+        this.totalSessions = sessions;
+        this.totalPrice = sessions * this.price;
+      }
       // Generate recurrence object based on schedule
       const recurrence = getRecurrenceFromSchedule(this.schedule);
       const zoomMeeting = await createZoomMeeting({
@@ -101,53 +109,6 @@ halakaSchema.pre("save", async function (next) {
   }
   next();
 });
-
-// Post-save: Generate sessions
-// halakaSchema.post("save", async function (doc) {
-//   if (doc._wasNew) {
-//     try {
-//       const Session = mongoose.model("Session");
-//       const sessions = [];
-//       let currentDate = new Date(doc.schedule.startDate);
-//       const endDate = new Date(doc.schedule.endDate);
-
-//       await Session.deleteMany({ halaka: doc._id });
-
-//       while (currentDate <= endDate) {
-//         const dayName = currentDate
-//           .toLocaleString("en-US", { weekday: "long" })
-//           .toLowerCase();
-
-//         if (doc.schedule.days.includes(dayName)) {
-//           sessions.push({
-//             halaka: doc._id,
-//             teacher: doc.teacher,
-//             scheduledDate: new Date(currentDate),
-//             scheduledStartTime: doc.schedule.startTime,
-//             scheduledEndTime: calculateEndTime(
-//               doc.schedule.startTime,
-//               doc.schedule.duration
-//             ),
-//             zoomMeeting: doc.zoomMeeting,
-//           });
-//         }
-
-//         currentDate.setDate(currentDate.getDate() + 1);
-//       }
-
-//       if (sessions.length > 0) {
-//         await Session.insertMany(sessions);
-//       }
-
-//       await mongoose.model("Teacher").findByIdAndUpdate(
-//         doc.teacher,
-//         { $addToSet: { halakat: doc._id } } // $addToSet prevents duplicates
-//       );
-//     } catch (error) {
-//       console.error("❌ Error generating sessions:", error);
-//     }
-//   }
-// });
 
 halakaSchema.post("save", async function (doc) {
   if (doc._wasNew) {
@@ -241,6 +202,20 @@ function calculateEndTime(startTime, duration) {
     .padStart(2, "0")}`;
 }
 
+function countAllSessions(schedule) {
+  let count = 0;
+  let currentDate = new Date(schedule.startDate);
+  const endDate = new Date(schedule.endDate);
+  const allowedDays = schedule.days;
+  while (currentDate <= endDate) {
+    const dayName = currentDate
+      .toLocaleString("en-US", { weekday: "long" })
+      .toLowerCase();
+    if (allowedDays.includes(dayName)) count++;
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return count;
+}
 const Halaka = mongoose.models.Halaka || mongoose.model("Halaka", halakaSchema);
 
 export default Halaka;
