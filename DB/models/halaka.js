@@ -160,6 +160,22 @@ halakaSchema.post("save", async function (doc) {
       console.error("❌ Error updating teacher's halakat:", error);
     }
   }
+
+  if (doc.isNew && doc.type === "private" && doc.student) {
+    try {
+      const Enrollment = mongoose.model("Enrollment");
+      await Enrollment.create({
+        student: doc.student,
+        halaka: doc._id,
+        status: "pending_action", // The initial state for an invitation
+      });
+
+      // Here you would also trigger the notification service
+      // sendNotification(doc.student, 'You have a new private halaka invitation!');
+    } catch (error) {
+      console.error("Failed to create enrollment for private halaka:", error);
+    }
+  }
 });
 
 halakaSchema.methods.getUpcomingSessions = function (
