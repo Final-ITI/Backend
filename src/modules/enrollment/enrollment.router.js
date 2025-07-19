@@ -6,9 +6,9 @@ import { validate } from "../../middlewares/validation.middleware.js";
 
 const router = Router();
 
-// POST /api/v1/enrollments - Enroll in a group halaka
+// POST /api/v1/enrollments/group - Enroll in a group halaka
 router.post(
-  "/",
+  "/group",
   authenticate,
   authorize("student"),
   validate(enrollInHalakaValidation),
