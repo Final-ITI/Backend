@@ -40,6 +40,25 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
     status: "pending_payment", // Initial status for group enrollment
   });
 
+  // --- Activate ChatGroup integration ---
+  // Add the student's userId to the halaka's chatGroup participants if not already present
+  if (halaka.chatGroup) {
+    const ChatGroup = (await import("../../../DB/models/chatGroup.js")).default;
+    const chatGroup = await ChatGroup.findById(halaka.chatGroup);
+    if (chatGroup) {
+      // Find the full student doc to get the userId
+      const studentDoc = await Student.findById(student._id).populate("userId");
+      if (studentDoc && studentDoc.userId) {
+        const userObjectId = studentDoc.userId._id;
+        if (!chatGroup.participants.map(id => id.toString()).includes(userObjectId.toString())) {
+          chatGroup.participants.push(userObjectId);
+          await chatGroup.save();
+        }
+      }
+    }
+  }
+  // --- END ChatGroup integration ---
+
   // 5. Prepare response for the frontend to proceed to payment
   const paymentDetails = {
     enrollmentId: enrollment._id,

@@ -9,24 +9,7 @@ import {
 import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
 
-// --- ENROLLMENT CHATGROUP INTEGRATION (Uncomment when Enrollment is implemented) ---
-/*
-import ChatGroup from "../../../DB/models/chatGroup.js";
-import Student from "../../../DB/models/student.js";
-import Halaka from "../../../DB/models/halaka.js";
 
-// After successful enrollment:
-// const halaka = await Halaka.findById(halakaId);
-// const chatGroup = await ChatGroup.findById(halaka.chatGroup);
-// const studentDoc = await Student.findById(studentId).populate("user");
-// if (studentDoc && studentDoc.user) {
-//   if (!chatGroup.participants.includes(studentDoc.user._id)) {
-//     chatGroup.participants.push(studentDoc.user._id);
-//     await chatGroup.save();
-//   }
-// }
-*/
-// --- END ENROLLMENT CHATGROUP INTEGRATION ---
 //teacher
 export const createHalaka = async (req, res) => {
   try {
@@ -84,8 +67,27 @@ export const createHalaka = async (req, res) => {
     }
 
     // Save Halaka
-    const halaka = new Halaka(halakaData);
+    let halaka = new Halaka(halakaData);
     await halaka.save();
+    // For group halaka, create a ChatGroup and assign it
+    if (halqaType === "halqa") {
+      // Get the teacher's userId
+      const teacherDoc = await Teacher.findById(teacher._id).populate("userId");
+      let teacherUserId = null;
+      if (teacherDoc && teacherDoc.userId) {
+        teacherUserId = teacherDoc.userId._id;
+      }
+      if (teacherUserId) {
+        const ChatGroup = (await import("../../../DB/models/chatGroup.js")).default;
+        const chatGroup = await ChatGroup.create({
+          halaka: halaka._id,
+          participants: [teacherUserId],
+          messages: [],
+        });
+        halaka.chatGroup = chatGroup._id;
+        await halaka.save();
+      }
+    }
 
     return created(res, halaka, "Halaka created successfully");
   } catch (err) {
@@ -254,16 +256,16 @@ export const getHalakaAttendance = async (req, res) => {
         const stu = r.student;
         return stu && stu.userId
           ? {
-              student: {
-                id: stu._id,
-                firstName: stu.userId.firstName,
-                lastName: stu.userId.lastName,
-                email: stu.userId.email,
-              },
-              status: r.status,
-              timeIn: r.timeIn,
-              timeOut: r.timeOut,
-            }
+            student: {
+              id: stu._id,
+              firstName: stu.userId.firstName,
+              lastName: stu.userId.lastName,
+              email: stu.userId.email,
+            },
+            status: r.status,
+            timeIn: r.timeIn,
+            timeOut: r.timeOut,
+          }
           : null;
       }),
     }));
