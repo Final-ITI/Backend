@@ -119,6 +119,75 @@ Authorization: Bearer <JWT>
 
 ---
 
+### 5. Send a Group Message
+
+- **Endpoint:** `POST /api/v1/chat/group/:groupId/message`
+- **Description:** Send a message to a specific chat group.
+- **Request Body:**
+  ```json
+  {
+    "message": "Hello Group!"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "_id": "...",
+    "senderId": "...",
+    "message": "Hello Group!",
+    "read": false,
+    "createdAt": "...",
+    "updatedAt": "...",
+    "__v": 0
+  }
+  ```
+
+---
+
+### 6. Get Group Messages
+
+- **Endpoint:** `GET /api/v1/chat/group/:groupId/messages`
+- **Description:** Get all messages for a specific chat group.
+- **Response:**
+  ```json
+  [
+    {
+      "_id": "...",
+      "senderId": { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
+      "message": "...",
+      "read": false,
+      "createdAt": "...",
+      "updatedAt": "...",
+      "__v": 0
+    },
+    ...
+  ]
+  ```
+
+---
+
+### 7. Get Group Information
+
+- **Endpoint:** `GET /api/v1/chat/group/:groupId`
+- **Description:** Get details about a specific chat group, including its participants.
+- **Response:**
+  ```json
+  {
+    "_id": "...",
+    "halaka": "...",
+    "participants": [
+      { "_id": "...", "firstName": "...", "lastName": "...", "profilePicture": "..." },
+      ...
+    ],
+    "messages": [], // Messages are fetched via /messages endpoint
+    "createdAt": "...",
+    "updatedAt": "...",
+    "__v": 0
+  }
+  ```
+
+---
+
 ## Real-Time Chat (Socket.IO)
 
 - **WebSocket URL:**
