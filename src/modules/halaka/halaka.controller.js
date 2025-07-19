@@ -24,10 +24,13 @@ export const createHalaka = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!title || !halqaType || !schedule || !curriculum || !price) {
+    if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
-        "Missing required fields: title, halqaType, schedule, curriculum, price",
+        "Missing required fields: title, halqaType, schedule, curriculum",
       ]);
+    }
+    if (halqaType === "private" && !teacher.sessionPrice) {
+      return validationError(res, ["Teacher does not have a sessionPrice set"]);
     }
     if (halqaType === "private" && !student) {
       return validationError(res, ["student is required for private halaka"]);
@@ -35,14 +38,12 @@ export const createHalaka = async (req, res) => {
     if (halqaType === "halqa" && !maxStudents) {
       return validationError(res, ["maxStudents is required for group halaka"]);
     }
-    console.log(req.user);
 
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
       return error(res, "Teacher not found ", 403);
     }
 
-    // Prepare data
     const halakaData = {
       title,
       description,
@@ -50,16 +51,18 @@ export const createHalaka = async (req, res) => {
       halqaType,
       schedule,
       curriculum,
-      price,
       status: "scheduled",
     };
+
     if (halqaType === "private") {
       halakaData.student = student;
       halakaData.maxStudents = 1;
       halakaData.currentStudents = 1;
+      halakaData.price = Number(teacher.sessionPrice);
     } else {
       halakaData.maxStudents = maxStudents;
       halakaData.currentStudents = 0;
+      halakaData.price = price;
     }
 
     // Save Halaka
@@ -98,7 +101,9 @@ export const updateHalaka = async (req, res) => {
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) halaka[key] = req.body[key];
     }
-
+    if (halaka.halqaType === "private") {
+      halaka.price = Number(teacher.sessionPrice);
+    }
     await halaka.save();
     return success(res, halaka, "Halaka updated successfully");
   } catch (err) {

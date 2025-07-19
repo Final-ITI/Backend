@@ -70,7 +70,7 @@ const teacherSchema = new Schema(
     // Pricing (for freelance teachers)
     sessionPrice: {
       // private
-      type: String,
+      type: Number,
       min: 1,
     },
     currency: {
