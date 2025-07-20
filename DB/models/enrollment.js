@@ -135,16 +135,11 @@ enrollmentSchema.pre("save", async function (next) {
         if (halaka.currentStudents >= halaka.maxStudents) {
           return next(new ApiError("This halaka is full.", 400));
         }
-      // For group halaqas, add student to the halaka's students array
-      const updatedHalaka = await Halaka.findByIdAndUpdate(
-        this.halaka,
-        { $addToSet: { students: this.student } },
-        { new: true }
-      );
-      if (!updatedHalaka) {
-        return next(new ApiError("Failed to update halaka with new student", 500));
-      }
-      console.log("Halaka updated with new student:", updatedHalaka);
+        // For group halaqas, add student to the halaka's students array
+        await Halaka.findByIdAndUpdate(this.halaka, {
+          $inc: { currentStudents: 1 },
+          $addToSet: { students: this.student },
+        });
       } else if (halaka.halqaType === "private") {
         // Logic for private halaqas
       }
