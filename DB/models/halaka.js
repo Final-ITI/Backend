@@ -116,19 +116,22 @@ halakaSchema.pre("save", async function (next) {
 // In halakaSchema.js
 
 halakaSchema.post("save", async function (doc) {
+
   // We only want to run this for NEWLY created documents.
   // The _wasNew property you set in the pre-hook is perfect for this.
   if (!doc._wasNew) {
     return;
   }
 
-  // --- Logic Block 1: Update the teacher's halakat list ---
-  try {
-    await mongoose
-      .model("Teacher")
-      .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
-  } catch (error) {
-    console.error("❌ Error updating teacher's halakat list:", error);
+  let teacher;
+  if (doc._wasNew) {
+    try {
+      teacher = await mongoose
+        .model("Teacher")
+        .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
+    } catch (error) {
+      console.error("❌ Error updating teacher's halakat:", error);
+    }
   }
 
   // --- Logic Block 2: Create enrollment and send notification for PRIVATE halaqas ---
