@@ -14,6 +14,7 @@ import contactRouter from "./modules/contact/contact.router.js";
 import webhookRouter from "./modules/webhook/webhook.router.js";
 import enrollmentRouter from "./modules/enrollment/enrollment.router.js";
 import notificationRouter from "./modules/notification/notification.router.js";
+import reviewRouter from "./modules/review/review.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -40,8 +41,9 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/halaka", halkaRouter);
   app.use("/api/v1/teacher", teacherRouter);
   app.use("/api/v1/webhook", webhookRouter);
-  app.use("/api/v1/enrollments", enrollmentRouter); 
+  app.use("/api/v1/enrollments", enrollmentRouter);
   app.use("/api/v1/notifications", notificationRouter);
+  app.use("/api/v1/reviews", reviewRouter);
 
   // 404 handler
   app.use(notFoundHandler);
