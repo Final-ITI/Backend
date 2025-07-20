@@ -374,7 +374,7 @@ Get the next 5 scheduled sessions for a specific halaka with real-time status ca
         "joinUrl": "https://zoom.us/j/123456789",
         "password": "abc123"
       },
-      "status": "scheduled" // or "in-progress"/"completed"
+      "status": "scheduled" // or "upcoming/in-progress"/"completed" or cancelled
     }
     // ...up to 5 sessions...
   ]
