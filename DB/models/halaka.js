@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
+import { sendNotification } from "../../src/services/notification.service.js";
+import ApiError from "../../src/utils/apiError.js";
+import { HalakaMailService } from "../../src/services/email.service.js";
 
 const { Schema } = mongoose;
 
@@ -140,25 +143,112 @@ halakaSchema.pre("save", async function (next) {
 });
 
 halakaSchema.post("save", async function (doc) {
-  if (!doc._wasNew) return;
+  // We only want to run this for NEWLY created documents.
+  // The _wasNew property you set in the pre-hook is perfect for this.
+  if (!doc._wasNew) {
+    return;
+  }
 
-  // add halaka → teacher.halakat[]
-  await mongoose
-    .model("Teacher")
-    .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
-
-  // auto-enrol single student for private halaka
+  let teacher;
+  if (doc._wasNew) {
+    try {
+      teacher = await mongoose
+        .model("Teacher")
+        .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
+    } catch (error) {
+      console.error("❌ Error updating teacher's halakat:", error);
+    }
+  }
+  // --- Logic Block 2: Create enrollment and send notification for PRIVATE halaqas ---
   if (doc.halqaType === "private" && doc.student) {
-    const Enrollment = mongoose.model("Enrollment");
-    await Enrollment.create({
-      student: doc.student,
-      halaka: doc._id,
-      status: "pending_action",
-      snapshot: {
-        halakaTitle: doc.title,
-        halakaType: doc.halqaType,
-      },
-    });
+    console.log("Creating enrollment for private halaka:", doc._id);
+    // Use 'type' as we agreed
+    try {
+      // Fetch all necessary data INSIDE this block to be self-contained
+      const Teacher = mongoose.model("Teacher");
+      const Enrollment = mongoose.model("Enrollment");
+
+      // Fetch the full teacher profile to get their name and session price
+      const teacherProfile = await Teacher.findById(doc.teacher).populate({
+        path: "userId",
+        select: "firstName lastName fullName",
+      });
+
+      if (!teacherProfile || !teacherProfile.userId) {
+        throw new ApiError("Teacher profile not found or incomplete.", 404);
+      }
+
+      const teacherName = `${teacherProfile.userId.firstName} ${teacherProfile.userId.lastName}`;
+
+      // Create the enrollment with the correct snapshot based on our latest logic
+      const enrollment = await Enrollment.create({
+        student: doc.student,
+        halaka: doc._id,
+        status: "pending_action",
+        snapshot: {
+          halakaTitle: doc.title,
+          totalPrice: doc.totalPrice,
+          currency: doc.currency || "EGP",
+        },
+      });
+
+      // Find the student's main user ID to send the notification to
+      const studentProfile = await mongoose
+        .model("Student")
+        .findById(doc.student)
+        .select("userId");
+      if (!studentProfile)
+        throw new ApiError(
+          "Student profile not found to send notification.",
+          404
+        );
+
+      // Send the notification
+      await sendNotification({
+        recipient: studentProfile.userId, // Send to the main User ID
+        sender: teacherProfile.userId._id, // Send from the main User ID
+        type: "halaka_invitation",
+        message: `المعلم ${teacherName} يدعوك للانضمام إلى حلقة "${doc.title}"`,
+        link: `/enrollments/invitations/${enrollment._id}`, // A more descriptive link
+      });
+
+      // Send email invitation
+      try {
+        // Get student's email from the user document
+        const studentUser = await mongoose
+          .model("User")
+          .findById(studentProfile.userId);
+        if (studentUser && studentUser.email) {
+          const enrollmentLink = `${process.env.FE_URL}/enrollments/invitations/${enrollment._id}`;
+
+          await HalakaMailService.sendHalakaInvitationEmail(
+            studentUser.email,
+            `${studentUser.firstName} ${studentUser.lastName}`,
+            teacherName,
+            {
+              title: doc.title,
+              description: doc.description,
+              schedule: doc.schedule,
+              price: doc.price,
+            },
+            enrollmentLink
+          );
+
+          console.log(
+            "✅ Email invitation sent successfully to:",
+            studentUser.email
+          );
+        }
+      } catch (emailError) {
+        console.error("❌ Failed to send email invitation:", emailError);
+        // Don't throw error here to avoid breaking the main flow
+      }
+    } catch (error) {
+      console.error(
+        "❌ Failed to create enrollment or send notification for private halaka:",
+        error
+      );
+    }
   }
 });
 
