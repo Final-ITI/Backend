@@ -10,8 +10,20 @@ import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
 import { paginated } from "../../utils/apiResponse.js";
 import User from "../../../DB/models/user.js";
+import {
+  HALQA_TYPE_AR,
+  STATUS_AR,
+  SESSION_STATUS_AR,
+  CURRICULUM_AR,
+  DAY_AR,
+} from "./ar.js";
 
 //teacher
+
+/* -------------------------------------------------- *
+ *  Halaka cruds                                     *
+ * -------------------------------------------------- */
+// Create a new Halaka
 export const createHalaka = async (req, res) => {
   try {
     const {
@@ -28,25 +40,27 @@ export const createHalaka = async (req, res) => {
     // Basic validation first
     if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
-        "Missing required fields: title, halqaType, schedule, curriculum",
+        "الحقول المطلوبة مفقودة: العنوان، نوع الحلقة، الجدول، المنهج",
       ]);
     }
 
     // Get teacher BEFORE validation that uses teacher data
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     // Now you can safely validate using teacher data
     if (halqaType === "private" && !teacher.sessionPrice) {
-      return validationError(res, ["Teacher does not have a sessionPrice set"]);
+      return validationError(res, ["المعلم لا يملك سعر جلسة محدد"]);
     }
+
     if (halqaType === "private" && !student) {
-      return validationError(res, ["student is required for private halaka"]);
+      return validationError(res, ["معرف الطالب مطلوب للحلقة الخاصة"]);
     }
+
     if (halqaType === "halqa" && !maxStudents) {
-      return validationError(res, ["maxStudents is required for group halaka"]);
+      return validationError(res, ["الحد الأقصى للطلاب مطلوب للحلقة الجماعية"]);
     }
 
     const halakaData = {
@@ -82,6 +96,7 @@ export const createHalaka = async (req, res) => {
       if (teacherDoc && teacherDoc.userId) {
         teacherUserId = teacherDoc.userId._id;
       }
+
       if (teacherUserId) {
         const ChatGroup = (await import("../../../DB/models/chatGroup.js"))
           .default;
@@ -95,25 +110,38 @@ export const createHalaka = async (req, res) => {
       }
     }
 
-    return created(res, halaka, "Halaka created successfully");
+    // Transform response to Arabic
+    const arabicHalaka = {
+      ...halaka.toObject(),
+      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
+      status: STATUS_AR[halaka.status] || halaka.status,
+      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
+      schedule: {
+        ...halaka.schedule,
+        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
+      },
+    };
+
+    return created(res, arabicHalaka, "تم إنشاء الحلقة بنجاح");
   } catch (err) {
-    console.error("❌ Create Halaka Error:", err);
-    return error(res, "Server error", 500, err);
+    console.error("❌ خطأ في إنشاء الحلقة:", err);
+    return error(res, "خطأ في الخادم", 500, err);
   }
 };
 
+//update Halaka
 export const updateHalaka = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-    if (!halaka) return notFound(res, "Halaka not found");
+    if (!halaka) return notFound(res, "لم يتم العثور على الحلقة");
 
     const allowedFields = [
       "title",
@@ -124,49 +152,81 @@ export const updateHalaka = async (req, res) => {
       "price",
       "status",
     ];
+
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) halaka[key] = req.body[key];
     }
+
     if (halaka.halqaType === "private") {
       halaka.price = Number(teacher.sessionPrice);
     }
+
     await halaka.save();
-    return success(res, halaka, "Halaka updated successfully");
+
+    // Transform response to Arabic
+    const arabicHalaka = {
+      ...halaka.toObject(),
+      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
+      status: STATUS_AR[halaka.status] || halaka.status,
+      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
+      schedule: {
+        ...halaka.schedule,
+        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
+      },
+    };
+
+    return success(res, arabicHalaka, "تم تحديث الحلقة بنجاح");
   } catch (err) {
-    return error(res, "Failed to update Halaka", 500, err);
+    return error(res, "فشل في تحديث الحلقة", 500, err);
   }
 };
-
+// Get a Halaka by ID
 export const getHalakaById = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-    if (!halaka) return notFound(res, "Halaka not found or not yours");
-    return success(res, halaka, "Halaka fetched successfully");
+    if (!halaka)
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
+
+    // Transform response to Arabic
+    const arabicHalaka = {
+      ...halaka.toObject(),
+      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
+      status: STATUS_AR[halaka.status] || halaka.status,
+      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
+      schedule: {
+        ...halaka.schedule,
+        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
+      },
+    };
+
+    return success(res, arabicHalaka, "تم جلب بيانات الحلقة بنجاح");
   } catch (err) {
-    return error(res, "Failed to fetch Halaka", 500, err);
+    return error(res, "فشل في جلب بيانات الحلقة", 500, err);
   }
 };
 
+// Delete a Halaka
 export const deleteHalaka = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-    if (!halaka) return notFound(res, "Halaka not found or not yours");
+    if (!halaka)
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
     await Session.deleteMany({ halaka: halaka._id });
     await Teacher.findByIdAndUpdate(halaka.teacher, {
@@ -177,110 +237,40 @@ export const deleteHalaka = async (req, res) => {
     return success(
       res,
       null,
-      "Halaka and all related data deleted successfully"
+      "تم حذف الحلقة وجميع البيانات المتعلقة بها بنجاح"
     );
   } catch (err) {
-    return error(res, "Failed to delete Halaka", 500, err);
+    return error(res, "فشل في حذف الحلقة", 500, err);
   }
 };
 
+// Get all Halakat for the logged-in teacher
 export const getHalakatByTeacher = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halakat = await Halaka.find({ teacher: teacher._id }).sort({
       createdAt: -1,
     });
-    return success(res, halakat, "Halakat fetched successfully");
-  } catch (err) {
-    return error(res, "Failed to fetch Halakat", 500, err);
-  }
-};
 
-//session
-// Get upcoming sessions for a specific Halaka
-// Update your existing getUpcomingSessions function
-export const getUpcomingSessions = async (req, res) => {
-  try {
-    const teacher = await Teacher.findOne({ userId: req.user._id });
-    if (!teacher) {
-      return error(res, "Teacher not found", 403);
-    }
-
-    const halaka = await Halaka.findOne({
-      _id: req.params.id,
-      teacher: teacher._id,
-    });
-    if (!halaka) return notFound(res, "Halaka not found or not yours");
-
-    const sessions = halaka.getUpcomingSessions(5);
-    const now = new Date();
-
-    const formattedSessions = sessions.map((session) => ({
-      scheduledDate: session.scheduledDate,
-      scheduledStartTime: session.scheduledStartTime,
-      scheduledEndTime: session.scheduledEndTime,
-      zoomMeeting: session.zoomMeeting,
-      status: session.isCancelled
-        ? "canceled"
-        : session.scheduledDate < now
-        ? "finished"
-        : "upcoming",
-    }));
-
-    return success(res, "Upcoming sessions", formattedSessions);
-  } catch (err) {
-    console.error(err);
-    return error(res, "Server error");
-  }
-};
-
-//attendance
-// Get attendance records for a specific Halaka
-export const getHalakaAttendance = async (req, res) => {
-  try {
-    const halaka = await Halaka.findById(req.params.id).populate({
-      path: "attendance.records.student",
-      populate: {
-        path: "userId",
-        select: "firstName lastName email _id",
+    // Transform response to Arabic
+    const arabicHalakat = halakat.map((halaka) => ({
+      ...halaka.toObject(),
+      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
+      status: STATUS_AR[halaka.status] || halaka.status,
+      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
+      schedule: {
+        ...halaka.schedule,
+        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
       },
-    });
-    if (!halaka) return notFound(res, "Halaka not found");
-
-    let attendance = halaka.attendance;
-    if (req.query.date)
-      attendance = attendance.filter(
-        (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
-      );
-
-    // Format each record for name and student ID
-    const formatted = attendance.map((a) => ({
-      sessionDate: a.sessionDate,
-      records: a.records.map((r) => {
-        const stu = r.student;
-        return stu && stu.userId
-          ? {
-              student: {
-                id: stu._id,
-                firstName: stu.userId.firstName,
-                lastName: stu.userId.lastName,
-                email: stu.userId.email,
-              },
-              status: r.status,
-              timeIn: r.timeIn,
-              timeOut: r.timeOut,
-            }
-          : null;
-      }),
     }));
 
-    return success(res, formatted, "Attendance data fetched");
+    return success(res, arabicHalakat, "تم جلب الحلقات بنجاح");
   } catch (err) {
-    return error(res, "Failed to fetch attendance", 500, err);
+    return error(res, "فشل في جلب الحلقات", 500, err);
   }
 };
 
@@ -303,7 +293,7 @@ export const getHalakaStudents = async (req, res) => {
         },
       });
 
-    if (!halaka) return notFound(res, "Halaka not found");
+    if (!halaka) return notFound(res, "لم يتم العثور على الحلقة");
 
     let studentsList = [];
     if (halaka.halqaType === "halqa") {
@@ -338,13 +328,14 @@ export const getHalakaStudents = async (req, res) => {
       ];
     }
 
-    return success(res, studentsList, "Students of this Halaka fetched");
+    return success(res, studentsList, "تم جلب طلاب الحلقة بنجاح");
   } catch (err) {
-    return error(res, "Failed to fetch Halaka students", 500, err);
+    return error(res, "فشل في جلب طلاب الحلقة", 500, err);
   }
 };
 
-//get all halakat in system filtered by teacher, title, status, curriculum
+//get all public halakat in system
+
 function getNextSessionText(schedule) {
   const dayNames = {
     sunday: "الأحد",
@@ -368,6 +359,7 @@ export const getAllHalakat = async (req, res) => {
   try {
     const filter = {};
     filter.halqaType = "halqa";
+
     if (req.query.title)
       filter.title = { $regex: req.query.title, $options: "i" };
     if (req.query.curriculum) filter.curriculum = req.query.curriculum;
@@ -428,7 +420,7 @@ export const getAllHalakat = async (req, res) => {
         populate: { path: "userId", select: "firstName lastName profileImage" },
       });
 
-    // Transform each Halaka to the required card format
+    // Transform each Halaka to Arabic format
     const transformed = halakat.map((halaka) => {
       const teacher = halaka.teacher;
       const user = teacher?.userId;
@@ -444,21 +436,21 @@ export const getAllHalakat = async (req, res) => {
           studentsCount: teacher?.performance?.totalStudents ?? 0,
           profileImage: user?.profileImage ?? "/default-profile.jpg",
         },
-        curriculum: halaka.curriculum,
+        curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
         price: halaka.price,
         currency: "ج.م",
         maxStudents: halaka.maxStudents,
         currentStudents: halaka.currentStudents,
         schedule: {
-          days: halaka.schedule.days,
+          days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
           startTime: halaka.schedule.startTime,
           duration: halaka.schedule.duration,
           frequency: halaka.schedule.frequency,
         },
         nextSession: getNextSessionText(halaka.schedule),
         location: "أونلاين",
-        status: halaka.status,
-        halqaType: halaka.halqaType,
+        status: STATUS_AR[halaka.status] || halaka.status,
+        halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
       };
     });
 
@@ -475,65 +467,155 @@ export const getAllHalakat = async (req, res) => {
     return paginated(res, transformed, paginationInfo);
   } catch (err) {
     console.log(err);
-    return error(res, "Failed to fetch Halakat", 500, err);
+    return error(res, "فشل في جلب الحلقات", 500, err);
   }
 };
 
-//session cancelation
-
-const yyyymmdd = (d) => new Date(d).toISOString().slice(0, 10);
+//-----------------------------------------------------------------------------------------------------
 
 /* -------------------------------------------------- *
- * Cancel Session                                     *
+ *                   Sessions
  * -------------------------------------------------- */
-export const cancelSession = async (req, res) => {
+
+/* -------------------------------------------------- *
+ *  Upcoming Session                                   *
+ * -------------------------------------------------- */
+// Get upcoming sessions for a specific Halaka
+export const getUpcomingSessions = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
-    if (!teacher) return error(res, "Teacher not found", 403);
+    if (!teacher) {
+      return error(res, "لم يتم العثور على المعلم", 403);
+    }
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-    if (!halaka) return notFound(res, "Halaka not found or not yours");
+    if (!halaka)
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
-    /* Validate input ------------------------------------------------ */
-    if (!req.body.sessionDate)
-      return error(res, "sessionDate is required", 400);
+    const sessions = halaka.getUpcomingSessions(5);
+    const now = new Date();
+
+    const formattedSessions = sessions.map((session) => {
+      let status = "قادمة";
+      if (session.isCancelled) {
+        status = "ملغاة";
+      } else if (session.scheduledDate < now) {
+        status = "منتهية";
+      }
+
+      return {
+        scheduledDate: session.scheduledDate,
+        scheduledStartTime: session.scheduledStartTime,
+        scheduledEndTime: session.scheduledEndTime,
+        zoomMeeting: session.zoomMeeting,
+        status: status,
+      };
+    });
+
+    return success(res, formattedSessions, "تم جلب الجلسات القادمة بنجاح");
+  } catch (err) {
+    console.error(err);
+    return error(res, "خطأ في الخادم", 500, err);
+  }
+};
+/* -------------------------------------------------- *
+ * Attendance                                        *
+ * -------------------------------------------------- */
+// Get attendance records for a specific Halaka
+export const getHalakaAttendance = async (req, res) => {
+  try {
+    const halaka = await Halaka.findById(req.params.id).populate({
+      path: "attendance.records.student",
+      populate: {
+        path: "userId",
+        select: "firstName lastName email _id profilePicture",
+      },
+    });
+    if (!halaka) return notFound(res, "لم يتم العثور على الحلقة");
+
+    let attendance = halaka.attendance;
+    if (req.query.date)
+      attendance = attendance.filter(
+        (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
+      );
+
+    // Format each record for name and student ID with Arabic status
+    const formatted = attendance.map((a) => ({
+      sessionDate: a.sessionDate,
+      records: a.records.map((r) => {
+        const stu = r.student;
+        return stu && stu.userId
+          ? {
+              student: {
+                id: stu._id,
+                firstName: stu.userId.firstName,
+                lastName: stu.userId.lastName,
+                email: stu.userId.email,
+                profilePicture:
+                  stu.userId.profilePicture || "/default-profile.jpg",
+              },
+              status: SESSION_STATUS_AR[r.status] || r.status,
+              timeIn: r.timeIn,
+              timeOut: r.timeOut,
+            }
+          : null;
+      }),
+    }));
+
+    return success(res, formatted, "تم جلب بيانات الحضور بنجاح");
+  } catch (err) {
+    return error(res, "فشل في جلب بيانات الحضور", 500, err);
+  }
+};
+/* -------------------------------------------------- *
+ * Cancel Session                                     *
+ * -------------------------------------------------- */
+const yyyymmdd = (d) => new Date(d).toISOString().slice(0, 10);
+
+export const cancelSession = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) return error(res, "لم يتم العثور على المعلم", 403);
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka)
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
+
+    if (!req.body.sessionDate) return error(res, "تاريخ الجلسة مطلوب", 400);
 
     const reqDate = yyyymmdd(req.body.sessionDate);
 
-    /* Build full session list incl. already-cancelled slots --------- */
     const need =
       (halaka.totalSessions || 0) + (halaka.cancelledSessions?.length || 0);
     const dates = getAllSessionDates(halaka.schedule, need);
-
     const match = dates.find((d) => yyyymmdd(d) === reqDate);
+
     if (!match)
-      return error(
-        res,
-        "Session date is not a valid upcoming scheduled session",
-        400
-      );
+      return error(res, "تاريخ الجلسة ليس من الجلسات المجدولة القادمة", 400);
 
     if (
       halaka.cancelledSessions?.some((c) => yyyymmdd(c.sessionDate) === reqDate)
     )
-      return error(res, "Session was already cancelled", 400);
+      return error(res, "الجلسة ملغاة مسبقاً", 400);
 
-    /* Record cancellation ------------------------------------------ */
     halaka.cancelledSessions.push({
       sessionDate: match,
       reason: req.body.reason || "",
       cancelledBy: teacher._id,
     });
 
-    /* Recalculate endDate & save ----------------------------------- */
     const newNeed =
       (halaka.totalSessions || 0) + halaka.cancelledSessions.length;
     const extDates = getAllSessionDates(halaka.schedule, newNeed);
     halaka.schedule.endDate = extDates[extDates.length - 1];
-    halaka.markModified("schedule"); // tell Mongoose nested field changed
+    halaka.markModified("schedule");
+
     await halaka.save();
 
     return success(
@@ -542,11 +624,11 @@ export const cancelSession = async (req, res) => {
         cancelledSession: { sessionDate: match, reason: req.body.reason || "" },
         newEndDate: halaka.schedule.endDate,
       },
-      "Session cancelled and schedule updated"
+      "تم إلغاء الجلسة وتحديث الجدول بنجاح"
     );
   } catch (err) {
-    console.error("Cancel Session Error:", err);
-    return error(res, "Failed to cancel session", 500, err);
+    console.error("خطأ في إلغاء الجلسة:", err);
+    return error(res, "فشل في إلغاء الجلسة", 500, err);
   }
 };
 
@@ -567,13 +649,14 @@ const findOriginalEndDate = (start, daysArr, total) => {
 export const getSessionAnalytics = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
-    if (!teacher) return error(res, "Teacher not found", 403);
+    if (!teacher) return error(res, "لم يتم العثور على المعلم", 403);
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-    if (!halaka) return notFound(res, "Halaka not found or not yours");
+    if (!halaka)
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
     const cancelledCnt = halaka.cancelledSessions?.length || 0;
     const fullList = getAllSessionDates(
@@ -584,6 +667,19 @@ export const getSessionAnalytics = async (req, res) => {
     const completedCnt = halaka.attendance.filter(
       (a) => yyyymmdd(a.sessionDate) <= yyyymmdd(new Date())
     ).length;
+
+    const findOriginalEndDate = (start, daysArr, total) => {
+      let cur = new Date(start),
+        cnt = 0;
+      while (cnt < total) {
+        const d = cur
+          .toLocaleString("en-US", { weekday: "long" })
+          .toLowerCase();
+        if (daysArr.includes(d)) cnt++;
+        if (cnt < total) cur.setDate(cur.getDate() + 1);
+      }
+      return cur;
+    };
 
     const analytics = {
       totalSessions: halaka.totalSessions,
@@ -600,20 +696,21 @@ export const getSessionAnalytics = async (req, res) => {
       currentEndDate: halaka.schedule.endDate,
     };
 
-    return success(res, analytics, "Session analytics generated");
+    return success(res, analytics, "تم إنشاء تحليلات الجلسات بنجاح");
   } catch (err) {
-    console.error("Analytics Error:", err);
-    return error(res, "Failed to generate session analytics", 500, err);
+    console.error("خطأ في التحليلات:", err);
+    return error(res, "فشل في إنشاء تحليلات الجلسات", 500, err);
   }
 };
 
-//restore and get
-// Get cancelled sessions for a halaka
+/* -------------------------------------------------- *
+ * Get cancelled Sessions                                     *
+ * -------------------------------------------------- */
 export const getCancelledSessions = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halaka = await Halaka.findOne({
@@ -630,7 +727,7 @@ export const getCancelledSessions = async (req, res) => {
       });
 
     if (!halaka) {
-      return notFound(res, "Halaka not found or not yours");
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
     }
 
     const cancelledSessions = halaka.cancelledSessions.map((cancelled) => ({
@@ -639,8 +736,21 @@ export const getCancelledSessions = async (req, res) => {
       reason: cancelled.reason,
       cancelledBy: cancelled.cancelledBy?.userId
         ? `${cancelled.cancelledBy.userId.firstName} ${cancelled.cancelledBy.userId.lastName}`
-        : "Unknown",
+        : "غير معروف",
     }));
+
+    const findOriginalEndDate = (start, daysArr, total) => {
+      let cur = new Date(start),
+        cnt = 0;
+      while (cnt < total) {
+        const d = cur
+          .toLocaleString("en-US", { weekday: "long" })
+          .toLowerCase();
+        if (daysArr.includes(d)) cnt++;
+        if (cnt < total) cur.setDate(cur.getDate() + 1);
+      }
+      return cur;
+    };
 
     return success(
       res,
@@ -660,38 +770,37 @@ export const getCancelledSessions = async (req, res) => {
           : null,
         extendedEndDate: halaka.schedule.endDate,
       },
-      "Cancelled sessions fetched successfully"
+      "تم جلب الجلسات الملغاة بنجاح"
     );
   } catch (err) {
-    console.error("Get Cancelled Sessions Error:", err);
-    return error(res, "Failed to fetch cancelled sessions", 500, err);
+    console.error("خطأ في جلب الجلسات الملغاة:", err);
+    return error(res, "فشل في جلب الجلسات الملغاة", 500, err);
   }
 };
 
-// Restore a cancelled session (optional feature)
+/* -------------------------------------------------- *
+ * Restore cancelled Session                           *
+ * -------------------------------------------------- */
 export const restoreSession = async (req, res) => {
   try {
     const { sessionDate } = req.body;
-
     if (!sessionDate) {
-      return validationError(res, ["Session date is required"]);
+      return validationError(res, ["تاريخ الجلسة مطلوب"]);
     }
 
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
-      return error(res, "Teacher not found", 403);
+      return error(res, "لم يتم العثور على المعلم", 403);
     }
 
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
     });
-
     if (!halaka) {
-      return notFound(res, "Halaka not found or not yours");
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
     }
 
-    // Find and remove the cancelled session
     const sessionDateObj = new Date(sessionDate);
     const cancelledIndex = halaka.cancelledSessions.findIndex(
       (cancelled) =>
@@ -700,13 +809,10 @@ export const restoreSession = async (req, res) => {
     );
 
     if (cancelledIndex === -1) {
-      return error(res, "Session was not cancelled", 400);
+      return error(res, "الجلسة لم تكن ملغاة", 400);
     }
 
-    // Remove from cancelled sessions
     halaka.cancelledSessions.splice(cancelledIndex, 1);
-
-    // Recalculate end date (may shrink the schedule)
     const newEndDate = halaka.calculateExtendedEndDate();
     halaka.schedule.endDate = newEndDate;
 
@@ -720,10 +826,24 @@ export const restoreSession = async (req, res) => {
         newEndDate: newEndDate,
         cancelledSessionsCount: halaka.cancelledSessions.length,
       },
-      "Session restored successfully"
+      "تم استعادة الجلسة بنجاح"
     );
   } catch (err) {
-    console.error("Restore Session Error:", err);
-    return error(res, "Failed to restore session", 500, err);
+    console.error("خطأ في استعادة الجلسة:", err);
+    return error(res, "فشل في استعادة الجلسة", 500, err);
   }
+};
+
+export const getHalakaEnums = (req, res) => {
+  return success(
+    res,
+    {
+      halqaType: HALQA_TYPE_AR,
+      status: STATUS_AR,
+      curriculum: CURRICULUM_AR,
+      sessionStatus: SESSION_STATUS_AR,
+      days: DAY_AR,
+    },
+    "تم جلب الخيارات المتاحة بنجاح"
+  );
 };

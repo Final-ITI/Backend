@@ -1,168 +1,207 @@
 import { body } from "express-validator";
 
+// Arabic validation messages
+const messages = {
+  required: (field) => `حقل «${field}» مطلوب`,
+  mustBeString: (field) => `حقل «${field}» يجب أن يكون نصًا`,
+  mustBeObject: (field) => `حقل «${field}» يجب أن يكون كائنًا`,
+  invalidEnum: (field, list) =>
+    `قيمة «${field}» غير صحيحة، القيم المسموح بها: ${list.join("، ")}`,
+  mustBeDate: (field) => `«${field}» يجب أن يكون تاريخًا بصيغة ISO 8601`,
+  mustBeTime: (field) => `«${field}» يجب أن يكون بتنسيق HH:mm`,
+  mustBePositiveInt: (field) => `«${field}» يجب أن يكون رقمًا صحيحًا موجبًا`,
+  mustBePositiveNum: (field) => `«${field}» يجب أن يكون رقمًا موجبًا`,
+  mustBeObjectId: (field) => `«${field}» يجب أن يكون ObjectId صحيحًا`,
+  mustBeArray: (field) => `«${field}» يجب أن يكون مصفوفة`,
+  maxLength: (field, max) => `«${field}» لا يجب أن يتجاوز ${max} حرف`,
+};
+
 export const createHalakaValidation = [
   body("title")
     .notEmpty()
-    .withMessage("Title is required")
+    .withMessage(messages.required("العنوان"))
     .isString()
-    .withMessage("Title must be a string"),
+    .withMessage(messages.mustBeString("العنوان")),
 
   body("halqaType")
     .notEmpty()
-    .withMessage("halqaType is required")
+    .withMessage(messages.required("نوع الحلقة"))
     .isIn(["private", "halqa"])
-    .withMessage("halqaType must be 'private' or 'halqa'"),
+    .withMessage(messages.invalidEnum("نوع الحلقة", ["private", "halqa"])),
 
   body("schedule")
     .notEmpty()
-    .withMessage("Schedule is required")
+    .withMessage(messages.required("الجدول"))
     .isObject()
-    .withMessage("Schedule must be an object"),
+    .withMessage(messages.mustBeObject("الجدول")),
 
   body("schedule.startDate")
     .notEmpty()
-    .withMessage("schedule.startDate is required")
+    .withMessage(messages.required("تاريخ البداية"))
     .isISO8601()
-    .withMessage("schedule.startDate must be a valid date"),
+    .withMessage(messages.mustBeDate("تاريخ البداية")),
 
   body("schedule.endDate")
     .notEmpty()
-    .withMessage("schedule.endDate is required")
+    .withMessage(messages.required("تاريخ النهاية"))
     .isISO8601()
-    .withMessage("schedule.endDate must be a valid date"),
+    .withMessage(messages.mustBeDate("تاريخ النهاية")),
 
   body("schedule.days")
     .isArray({ min: 1 })
-    .withMessage("At least one day is required in schedule.days"),
+    .withMessage("يجب اختيار يوم واحد على الأقل في الجدول"),
 
   body("schedule.startTime")
     .notEmpty()
-    .withMessage("schedule.startTime is required")
+    .withMessage(messages.required("وقت البداية"))
     .matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
-    .withMessage("startTime must be in HH:mm format"),
+    .withMessage(messages.mustBeTime("وقت البداية")),
 
   body("schedule.duration")
     .notEmpty()
-    .withMessage("schedule.duration is required")
+    .withMessage(messages.required("المدة"))
     .isInt({ min: 1 })
-    .withMessage("duration must be a positive integer"),
+    .withMessage(messages.mustBePositiveInt("المدة")),
 
   body("curriculum")
     .notEmpty()
-    .withMessage("Curriculum is required")
+    .withMessage(messages.required("المنهج"))
     .isIn(["quran_memorization", "tajweed", "arabic", "islamic_studies"])
-    .withMessage("Invalid curriculum type"),
+    .withMessage(
+      messages.invalidEnum("المنهج", [
+        "quran_memorization",
+        "tajweed",
+        "arabic",
+        "islamic_studies",
+      ])
+    ),
 
   // Conditional validation for group halaka
   body("maxStudents")
     .if(body("halqaType").equals("halqa"))
     .notEmpty()
-    .withMessage("maxStudents is required for group halaka")
+    .withMessage(messages.required("الحد الأقصى للطلاب"))
     .isInt({ min: 1 })
-    .withMessage("maxStudents must be a positive integer"),
+    .withMessage(messages.mustBePositiveInt("الحد الأقصى للطلاب")),
 
   // Conditional validation for private halaka
   body("student")
     .if(body("halqaType").equals("private"))
     .notEmpty()
-    .withMessage("student is required for private halaka")
+    .withMessage(messages.required("معرّف الطالب"))
     .isMongoId()
-    .withMessage("student must be a valid ObjectId"),
+    .withMessage(messages.mustBeObjectId("معرّف الطالب")),
 ];
 
 export const updateHalakaValidation = [
   body("title")
     .optional()
     .isString()
-    .withMessage("Title must be a string")
+    .withMessage(messages.mustBeString("العنوان"))
     .notEmpty()
-    .withMessage("Title cannot be empty"),
+    .withMessage("لا يمكن ترك العنوان فارغًا"),
 
   body("description")
     .optional()
     .isString()
-    .withMessage("Description must be a string"),
+    .withMessage(messages.mustBeString("الوصف")),
 
   body("schedule")
     .optional()
     .isObject()
-    .withMessage("Schedule must be an object"),
+    .withMessage(messages.mustBeObject("الجدول")),
 
   body("schedule.frequency")
     .optional()
     .isIn(["daily", "weekly", "biweekly"])
-    .withMessage("Invalid frequency"),
+    .withMessage(
+      messages.invalidEnum("التكرار", ["daily", "weekly", "biweekly"])
+    ),
 
   body("schedule.days")
     .optional()
     .isArray({ min: 1 })
-    .withMessage("At least one day is required in schedule.days"),
+    .withMessage("يجب اختيار يوم واحد على الأقل في الجدول"),
 
   body("schedule.startTime")
     .optional()
     .matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
-    .withMessage("startTime must be in HH:mm format"),
+    .withMessage(messages.mustBeTime("وقت البداية")),
 
   body("schedule.duration")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("duration must be a positive integer"),
+    .withMessage(messages.mustBePositiveInt("المدة")),
 
   body("schedule.startDate")
     .optional()
     .isISO8601()
-    .withMessage("startDate must be a valid date"),
+    .withMessage(messages.mustBeDate("تاريخ البداية")),
 
   body("schedule.endDate")
     .optional()
     .isISO8601()
-    .withMessage("endDate must be a valid date"),
+    .withMessage(messages.mustBeDate("تاريخ النهاية")),
 
   body("schedule.timezone")
     .optional()
     .isString()
-    .withMessage("timezone must be a string"),
+    .withMessage(messages.mustBeString("المنطقة الزمنية")),
 
   body("curriculum")
     .optional()
     .isIn(["quran_memorization", "tajweed", "arabic", "islamic_studies"])
-    .withMessage("Invalid curriculum type"),
+    .withMessage(
+      messages.invalidEnum("المنهج", [
+        "quran_memorization",
+        "tajweed",
+        "arabic",
+        "islamic_studies",
+      ])
+    ),
 
   body("maxStudents")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("maxStudents must be a positive integer"),
+    .withMessage(messages.mustBePositiveInt("الحد الأقصى للطلاب")),
 
   body("price")
     .optional()
     .isFloat({ min: 0 })
-    .withMessage("Price must be a positive number"),
+    .withMessage(messages.mustBePositiveNum("السعر")),
 
   body("status")
     .optional()
     .isIn(["scheduled", "active", "completed", "cancelled"])
-    .withMessage("Invalid status"),
+    .withMessage(
+      messages.invalidEnum("الحالة", [
+        "scheduled",
+        "active",
+        "completed",
+        "cancelled",
+      ])
+    ),
 ];
 
 export const cancelSessionValidation = [
   body("sessionDate")
     .notEmpty()
-    .withMessage("Session date is required")
+    .withMessage(messages.required("تاريخ الجلسة"))
     .isISO8601()
-    .withMessage("Session date must be a valid date (YYYY-MM-DD format)"),
+    .withMessage(messages.mustBeDate("تاريخ الجلسة")),
 
   body("reason")
     .optional()
     .isString()
-    .withMessage("Reason must be a string")
+    .withMessage(messages.mustBeString("السبب"))
     .isLength({ max: 500 })
-    .withMessage("Reason cannot exceed 500 characters"),
+    .withMessage(messages.maxLength("السبب", 500)),
 ];
 
 export const restoreSessionValidation = [
   body("sessionDate")
     .notEmpty()
-    .withMessage("Session date is required")
+    .withMessage(messages.required("تاريخ الجلسة"))
     .isISO8601()
-    .withMessage("Session date must be a valid date (YYYY-MM-DD format)"),
+    .withMessage(messages.mustBeDate("تاريخ الجلسة")),
 ];
