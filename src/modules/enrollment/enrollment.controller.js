@@ -9,10 +9,6 @@ import Enrollment from "../../../DB/models/enrollment.js";
 import Halaka from "../../../DB/models/halaka.js";
 import Student from "../../../DB/models/student.js";
 
-/**
- * @desc    Enroll a student in a GROUP halaka
- * @route   POST /api/v1/enrollments/group
- */
 export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const { id: halakaId } = req.body;
   const userId = req.user._id;
@@ -74,7 +70,7 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const paymentDetails = {
     enrollmentId: enrollment._id,
     amount: halaka.totalPrice,
-    currency: enrollment.snapshot.currency || "EGP",
+    currency: enrollment.snapshot.currency ,
     description: `Enrollment in: ${halaka.title}`,
   };
 
