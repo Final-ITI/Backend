@@ -307,6 +307,7 @@ function getNextSessionText(schedule) {
 export const getAllHalakat = async (req, res) => {
   try {
     const filter = {};
+    filter.halqaType = "halqa";
     if (req.query.title)
       filter.title = { $regex: req.query.title, $options: "i" };
     if (req.query.curriculum) filter.curriculum = req.query.curriculum;
