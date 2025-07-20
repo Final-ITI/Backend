@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
+import { sendNotification } from "../../src/services/notification.service.js";
+import ApiError from "../../src/utils/apiError.js";
 
 const Schema = mongoose.Schema;
 
@@ -9,8 +11,8 @@ const halakaSchema = new Schema(
     title: { type: String, required: true },
     description: String,
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
-    student: { type: Schema.Types.ObjectId, ref: "Student" }, // For private halakas
-    students: [{ type: Schema.Types.ObjectId, ref: "Student" }], // For group halakas
+    students: [{ type: Schema.Types.ObjectId, ref: "Student" }],
+    student: { type: Schema.Types.ObjectId, ref: "Student" },
     chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group
     halqaType: { type: String, required: true, enum: ["private", "halqa"] },
     schedule: {
@@ -111,7 +113,16 @@ halakaSchema.pre("save", async function (next) {
   next();
 });
 
+// In halakaSchema.js
+
 halakaSchema.post("save", async function (doc) {
+
+  // We only want to run this for NEWLY created documents.
+  // The _wasNew property you set in the pre-hook is perfect for this.
+  if (!doc._wasNew) {
+    return;
+  }
+
   let teacher;
   if (doc._wasNew) {
     try {
@@ -123,24 +134,59 @@ halakaSchema.post("save", async function (doc) {
     }
   }
 
-  if (doc.isNew && doc.type === "private" && doc.student) {
+  // --- Logic Block 2: Create enrollment and send notification for PRIVATE halaqas ---
+  if (doc.type === "private" && doc.student) {
+    // Use 'type' as we agreed
     try {
+      // Fetch all necessary data INSIDE this block to be self-contained
+      const Teacher = mongoose.model("Teacher");
       const Enrollment = mongoose.model("Enrollment");
-      await Enrollment.create({
+
+      // Fetch the full teacher profile to get their name and session price
+      const teacherProfile = await Teacher.findById(doc.teacher).populate({
+        path: "userId",
+        select: "firstName lastName fullName",
+      });
+
+      if (!teacherProfile || !teacherProfile.userId) {
+        throw new ApiError("Teacher profile not found or incomplete.", 404);
+      }
+
+      const teacherName = `${teacherProfile.userId.firstName} ${teacherProfile.userId.lastName}`;
+
+      // Create the enrollment with the correct snapshot based on our latest logic
+      const enrollment = await Enrollment.create({
         student: doc.student,
         halaka: doc._id,
         status: "pending_action",
         snapshot: {
           halakaTitle: doc.title,
-          halakaType: doc.halqaType,
-          pricePerStudent: teacher.sessionPrice,
+          totalPrice: doc.totalPrice,
+          currency: doc.currency || "EGP", 
         },
       });
 
-      // Here you would also trigger the notification service
-      // sendNotification(doc.student, 'You have a new private halaka invitation!');
+      // Find the student's main user ID to send the notification to
+      const studentProfile = await mongoose
+        .model("Student")
+        .findById(doc.student)
+        .select("userId");
+      if (!studentProfile)
+        throw new ApiError("Student profile not found to send notification.", 404);
+
+      // Send the notification
+      await sendNotification({
+        recipient: studentProfile.userId, // Send to the main User ID
+        sender: teacherProfile.userId._id, // Send from the main User ID
+        type: "halaka_invitation",
+        message: `المعلم ${teacherName} يدعوك للانضمام إلى حلقة "${doc.title}"`,
+        link: `/enrollments/invitations/${enrollment._id}`, // A more descriptive link
+      });
     } catch (error) {
-      console.error("Failed to create enrollment for private halaka:", error);
+      console.error(
+        "❌ Failed to create enrollment or send notification for private halaka:",
+        error
+      );
     }
   }
 });
