@@ -12,6 +12,7 @@ import {
   getCancelledSessions,
   restoreSession,
   getSessionAnalytics,
+  getHalakaStudents,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -63,6 +64,13 @@ router.get(
   getHalakaAttendance
 );
 
+router.get(
+  "/:id/students",
+  authenticate,
+  authorize("teacher"),
+  getHalakaStudents
+);
+
 //session cancelation
 // Cancel a specific session
 router.post(
@@ -95,4 +103,5 @@ router.get(
   authorize("teacher"),
   getSessionAnalytics
 );
+
 export default router;

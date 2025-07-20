@@ -284,6 +284,66 @@ export const getHalakaAttendance = async (req, res) => {
   }
 };
 
+// Get students enrolled in a specific Halaka
+export const getHalakaStudents = async (req, res) => {
+  try {
+    const halaka = await Halaka.findById(req.params.id)
+      .populate({
+        path: "students",
+        populate: {
+          path: "userId",
+          select: "firstName lastName email _id profilePicture",
+        },
+      })
+      .populate({
+        path: "student",
+        populate: {
+          path: "userId",
+          select: "firstName lastName email _id profilePicture",
+        },
+      });
+
+    if (!halaka) return notFound(res, "Halaka not found");
+
+    let studentsList = [];
+    if (halaka.halqaType === "halqa") {
+      studentsList = (halaka.students || [])
+        .map((stu) => {
+          return stu.userId
+            ? {
+                id: stu._id,
+                firstName: stu.userId.firstName,
+                lastName: stu.userId.lastName,
+                email: stu.userId.email,
+                profilePicture:
+                  stu.userId.profilePicture || "/default-profile.jpg",
+              }
+            : null;
+        })
+        .filter(Boolean);
+    } else if (
+      halaka.halqaType === "private" &&
+      halaka.student &&
+      halaka.student.userId
+    ) {
+      studentsList = [
+        {
+          id: halaka.student._id,
+          firstName: halaka.student.userId.firstName,
+          lastName: halaka.student.userId.lastName,
+          email: halaka.student.userId.email,
+          profilePicture:
+            halaka.student.userId.profilePicture || "/default-profile.jpg",
+        },
+      ];
+    }
+
+    return success(res, studentsList, "Students of this Halaka fetched");
+  } catch (err) {
+    return error(res, "Failed to fetch Halaka students", 500, err);
+  }
+};
+
 //get all halakat in system filtered by teacher, title, status, curriculum
 function getNextSessionText(schedule) {
   const dayNames = {
