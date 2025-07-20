@@ -37,7 +37,18 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const enrollment = await Enrollment.create({
     student: student._id,
     halaka: halakaId,
-    status: "pending_payment", // Initial status for group enrollment
+    status: "pending_payment",
+    snapshot: {
+      halakaTitle: halaka.title,
+      halakaType: halaka.halqaType,
+      pricePerSession: halaka.price,
+      pricePerStudent: halaka.totalPrice,
+    },
+  });
+  // Increment currentStudents count in the halaka
+  await Halaka.findByIdAndUpdate(halakaId, {
+    $inc: { currentStudents: 1 },
+    $addToSet: { students: student._id },
   });
 
   // --- Activate ChatGroup integration ---
@@ -50,7 +61,11 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
       const studentDoc = await Student.findById(student._id).populate("userId");
       if (studentDoc && studentDoc.userId) {
         const userObjectId = studentDoc.userId._id;
-        if (!chatGroup.participants.map(id => id.toString()).includes(userObjectId.toString())) {
+        if (
+          !chatGroup.participants
+            .map((id) => id.toString())
+            .includes(userObjectId.toString())
+        ) {
           chatGroup.participants.push(userObjectId);
           await chatGroup.save();
         }

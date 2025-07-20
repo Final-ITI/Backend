@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ApiError from "../../src/utils/apiError.js";
+import { isHalakaEnrollmentClosed } from "../../src/utils/dateUtils.js";
 const Schema = mongoose.Schema;
 
 const enrollmentSchema = new Schema(
@@ -37,6 +38,30 @@ const enrollmentSchema = new Schema(
       default: 0,
       min: 0,
     },
+    /**
+     * @desc    A snapshot of key halaka and price data at the moment of enrollment.
+     * This is for historical accuracy and invoicing, ensuring that even if
+     * the original halaka or teacher's price changes, this record remains correct.
+     */
+    snapshot: {
+      halakaTitle: {
+        type: String,
+        required: true,
+      },
+      // For group halaqas
+      pricePerStudent: {
+        type: Number,
+      },
+      // For private halaqas (package purchases)
+      pricePerSession: {
+        type: Number,
+      },
+      currency: {
+        type: String,
+        required: true,
+        default: "EGP",
+      },
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt fields
@@ -44,6 +69,9 @@ const enrollmentSchema = new Schema(
     toObject: { virtuals: true },
   }
 );
+
+// --- INDEXES ---
+enrollmentSchema.index({ student: 1, halaka: 1 }, { unique: true });
 
 // --- VIRTUALS ---
 // Virtuals are not stored in the database but are computed on the fly.
@@ -67,7 +95,6 @@ enrollmentSchema.virtual("isPrivate").get(function () {
   return this.halakaDetails && this.halakaDetails.halqaType === "private";
 });
 
-
 // --- MIDDLEWARE ---
 // Consolidated pre-save hook for all validations
 enrollmentSchema.pre("save", async function (next) {
@@ -81,27 +108,48 @@ enrollmentSchema.pre("save", async function (next) {
       });
       if (existingEnrollment) {
         // Use standard Error here
-        return next(new Error("You are already enrolled in this halaka."));
+        return next(
+          new ApiError("You are already enrolled in this halaka.", 400)
+        );
       }
 
       // 2. Fetch Halaka details for further validation
       const Halaka = mongoose.model("Halaka");
       const halaka = await Halaka.findById(this.halaka);
       if (!halaka) {
-        return next(new Error("Halaka not found."));
+        return next(new ApiError("Halaka not found", 404));
       }
-      console.log("Halaka found from DB:", halaka);
-      // 3. Business logic validation for group halaqas
+
+      // 3. Check if enrollment is still allowed (start date hasn't passed)
+      if (isHalakaEnrollmentClosed(halaka.schedule)) {
+        return next(
+          new ApiError(
+            "Cannot enroll in this halaka. The start date and time has already passed.",
+            400
+          )
+        );
+      }
+
+      // 4. Business logic validation for group halaqas
       if (halaka.halqaType === "halqa") {
         if (halaka.currentStudents >= halaka.maxStudents) {
-          return next(new Error("This halaka is full."));
+          return next(new ApiError("This halaka is full.", 400));
         }
-      }else{
-        return next(new Error("This enrollment process is for group halaqas only."));
+      // For group halaqas, add student to the halaka's students array
+      const updatedHalaka = await Halaka.findByIdAndUpdate(
+        this.halaka,
+        { $addToSet: { students: this.student } },
+        { new: true }
+      );
+      if (!updatedHalaka) {
+        return next(new ApiError("Failed to update halaka with new student", 500));
+      }
+      console.log("Halaka updated with new student:", updatedHalaka);
+      } else if (halaka.halqaType === "private") {
+        // Logic for private halaqas
       }
       // Note: We don't need to check if the type is 'private' because the controller
       // for private invitations will handle that logic separately.
-
     } catch (error) {
       return next(error);
     }
