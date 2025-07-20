@@ -45,11 +45,7 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
       pricePerStudent: halaka.totalPrice,
     },
   });
-  // Increment currentStudents count in the halaka
-  await Halaka.findByIdAndUpdate(halakaId, {
-    $inc: { currentStudents: 1 },
-    $addToSet: { students: student._id },
-  });
+
 
   // --- Activate ChatGroup integration ---
   // Add the student's userId to the halaka's chatGroup participants if not already present
@@ -77,8 +73,8 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   // 5. Prepare response for the frontend to proceed to payment
   const paymentDetails = {
     enrollmentId: enrollment._id,
-    amount: halaka.pricePerStudent, // Use the correct field name
-    currency: "EGP",
+    amount: halaka.totalPrice,
+    currency: enrollment.snapshot.currency || "EGP",
     description: `Enrollment in: ${halaka.title}`,
   };
 
