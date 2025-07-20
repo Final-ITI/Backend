@@ -269,39 +269,52 @@ export const getHalakaAttendance = async (req, res) => {
 };
 
 //get all halakat in system filtered by teacher, title, status, curriculum
+function getNextSessionText(schedule) {
+  const dayNames = {
+    sunday: "الأحد",
+    monday: "الاثنين",
+    tuesday: "الثلاثاء",
+    wednesday: "الأربعاء",
+    thursday: "الخميس",
+    friday: "الجمعة",
+    saturday: "السبت",
+  };
+  // Show next occurring day in user's schedule
+  if (schedule.days && schedule.days.length > 0) {
+    const nextDay = schedule.days[0];
+    const arabicDay = dayNames[nextDay] || nextDay;
+    return `${arabicDay} - ${schedule.startTime}`;
+  }
+  return "غير محدد";
+}
+
 export const getAllHalakat = async (req, res) => {
   try {
     const filter = {};
-    // 1. Build filters from query
     if (req.query.title)
       filter.title = { $regex: req.query.title, $options: "i" };
     if (req.query.curriculum) filter.curriculum = req.query.curriculum;
     if (req.query.status) filter.status = req.query.status;
     if (req.query.teacher) filter.teacher = req.query.teacher;
 
-    // 2. For teacherName, search teachers first and filter by their IDs
+    // Flexible teacher name filtering by referenced user fields
     if (req.query.teacherName) {
       const nameParts = req.query.teacherName.trim().split(/\s+/);
       let userQuery;
-
       if (nameParts.length === 1) {
-        // Old logic: single word, search both first and last name
         userQuery = {
           $or: [
             { firstName: { $regex: nameParts[0], $options: "i" } },
             { lastName: { $regex: nameParts[0], $options: "i" } },
           ],
         };
-      } else if (nameParts.length >= 2) {
-        // Multi-word: try all combinations!
+      } else {
         userQuery = {
           $or: [
-            // first: "nesma", last: "fayed"
             {
               firstName: { $regex: nameParts[0], $options: "i" },
               lastName: { $regex: nameParts.slice(1).join(" "), $options: "i" },
             },
-            // first: "fayed", last: "nesma"
             {
               firstName: {
                 $regex: nameParts.slice(1).join(" "),
@@ -309,40 +322,70 @@ export const getAllHalakat = async (req, res) => {
               },
               lastName: { $regex: nameParts[0], $options: "i" },
             },
-            // fallback: either field contains full string
             { firstName: { $regex: req.query.teacherName, $options: "i" } },
             { lastName: { $regex: req.query.teacherName, $options: "i" } },
           ],
         };
       }
-
-      // Lookup users with this query
       const users = await User.find(userQuery);
       const userIds = users.map((u) => u._id);
-
       const teachers = await Teacher.find({ userId: { $in: userIds } });
-      const teacherIds = teachers.map((t) => t._id);
-
-      filter.teacher = { $in: teacherIds };
+      filter.teacher = { $in: teachers.map((t) => t._id) };
     }
 
-    // 3. Handle pagination params
+    // Pagination
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // 4. Get total count for pagination
     const totalItems = await Halaka.countDocuments(filter);
     const totalPages = Math.ceil(totalItems / limit);
 
-    // 5. Query data (AND POPULATE TEACHER!)
+    // Populate teacher and the referenced user
     const halakat = await Halaka.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("teacher");
+      .populate({
+        path: "teacher",
+        populate: { path: "userId", select: "firstName lastName profileImage" },
+      });
 
-    // 6. Prepare pagination info
+    // Transform each Halaka to the required card format
+    const transformed = halakat.map((halaka) => {
+      const teacher = halaka.teacher;
+      const user = teacher?.userId;
+      return {
+        id: halaka._id.toString(),
+        title: halaka.title,
+        description: halaka.description || "",
+        teacher: {
+          name: user
+            ? `أ. ${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
+            : "غير متوفر",
+          rating: teacher?.performance?.rating ?? 0,
+          studentsCount: teacher?.performance?.totalStudents ?? 0,
+          profileImage: user?.profileImage ?? "/default-profile.jpg",
+        },
+        curriculum: halaka.curriculum,
+        price: halaka.price,
+        currency: "ج.م",
+        maxStudents: halaka.maxStudents,
+        currentStudents: halaka.currentStudents,
+        schedule: {
+          days: halaka.schedule.days,
+          startTime: halaka.schedule.startTime,
+          duration: halaka.schedule.duration,
+          frequency: halaka.schedule.frequency,
+        },
+        nextSession: getNextSessionText(halaka.schedule),
+        location: "أونلاين",
+        status: halaka.status,
+        halqaType: halaka.halqaType,
+      };
+    });
+
+    // Pagination info object
     const paginationInfo = {
       currentPage: page,
       totalPages,
@@ -352,8 +395,7 @@ export const getAllHalakat = async (req, res) => {
       hasPrev: page > 1,
     };
 
-    // 7. Respond using standardized paginated response
-    return paginated(res, halakat, paginationInfo);
+    return paginated(res, transformed, paginationInfo);
   } catch (err) {
     console.log(err);
     return error(res, "Failed to fetch Halakat", 500, err);
