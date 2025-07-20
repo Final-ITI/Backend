@@ -9,8 +9,9 @@ const halakaSchema = new Schema(
     title: { type: String, required: true },
     description: String,
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
-    students: [{ type: Schema.Types.ObjectId, ref: "Student" }],
-    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group  
+    student: { type: Schema.Types.ObjectId, ref: "Student" }, // For private halakas
+    students: [{ type: Schema.Types.ObjectId, ref: "Student" }], // For group halakas
+    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group
     halqaType: { type: String, required: true, enum: ["private", "halqa"] },
     schedule: {
       frequency: {
@@ -114,10 +115,9 @@ halakaSchema.post("save", async function (doc) {
   let teacher;
   if (doc._wasNew) {
     try {
-      teacher = await mongoose.model("Teacher").findByIdAndUpdate(
-        doc.teacher,
-        { $addToSet: { halakat: doc._id } } 
-      );
+      teacher = await mongoose
+        .model("Teacher")
+        .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
     } catch (error) {
       console.error("❌ Error updating teacher's halakat:", error);
     }

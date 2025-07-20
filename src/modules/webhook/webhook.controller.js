@@ -1,10 +1,40 @@
-// src/modules/webhook/webhook.controller.js
-
 import Halaka from "../../../DB/models/halaka.js";
 import User from "../../../DB/models/user.js";
 import Student from "../../../DB/models/student.js";
 import crypto from "crypto";
 import { success, error, notFound } from "../../utils/apiResponse.js";
+
+/**
+ * Find the session date from schedule that matches the event date.
+ * Returns the scheduled date object if matched, or null if not found.
+ */
+function getScheduledSessionDate(schedule, eventTimeIso) {
+  if (!schedule?.days?.length) return null;
+  const eventDate = new Date(eventTimeIso);
+  const eventDay = eventDate
+    .toLocaleString("en-US", { weekday: "long" })
+    .toLowerCase();
+  const sessionDays = schedule.days;
+
+  // Only consider session days after startDate, before endDate, and matching the day
+  let datePtr = new Date(schedule.startDate);
+  const endDate = new Date(schedule.endDate);
+  while (datePtr <= endDate) {
+    const dayName = datePtr
+      .toLocaleString("en-US", { weekday: "long" })
+      .toLowerCase();
+    // If the recurring session is on the same day and same date as the Zoom event
+    if (
+      sessionDays.includes(dayName) &&
+      datePtr.toISOString().slice(0, 10) ===
+        eventDate.toISOString().slice(0, 10)
+    ) {
+      return new Date(datePtr);
+    }
+    datePtr.setDate(datePtr.getDate() + 1);
+  }
+  return null; // No matching scheduled session for this event!
+}
 
 async function upsertAttendance({
   halaka,
@@ -14,10 +44,11 @@ async function upsertAttendance({
   eventTime,
 }) {
   let entry = halaka.attendance.find(
-    (e) => e.sessionDate.toISOString().slice(0, 10) === sessionDate.slice(0, 10)
+    (e) =>
+      e.sessionDate &&
+      e.sessionDate.toISOString().slice(0, 10) === sessionDate.slice(0, 10)
   );
   if (!entry) {
-    console.log("creating entity for date", sessionDate);
     entry = { sessionDate: new Date(sessionDate), records: [] };
     halaka.attendance.push(entry);
   }
@@ -39,7 +70,7 @@ async function upsertAttendance({
 
 export const zoomAttendanceWebhook = async (req, res) => {
   try {
-    // 1. Handle validation challenge and exit early
+    // Zoom webhook URL validation (security challenge)
     if (req.body.event === "endpoint.url_validation") {
       const plainToken = req.body.payload.plainToken;
       const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
@@ -47,11 +78,10 @@ export const zoomAttendanceWebhook = async (req, res) => {
         .createHmac("sha256", secret)
         .update(plainToken)
         .digest("hex");
-      // Do not run any other logic for validation events
       return res.status(200).json({ plainToken, encryptedToken });
     }
 
-    // 2. All remaining code is ONLY for proper webhook events
+    // --- Process join/leave events ---
     const { event, payload } = req.body;
     const participant = payload?.object?.participant;
     const meetingId = payload?.object?.id;
@@ -64,23 +94,61 @@ export const zoomAttendanceWebhook = async (req, res) => {
     }
     if (!eventTime) eventTime = new Date().toISOString();
 
-    // Find halaka
+    // 1. Find halaka by Zoom meetingId
     const halaka = await Halaka.findOne({ "zoomMeeting.meetingId": meetingId });
     if (!halaka) return notFound(res, "Halaka not found for meeting", 404);
 
+    // 2. Find user & student
     const user = await User.findOne({ email: participant?.email });
     if (!user) return notFound(res, "User email not found", 404);
 
-    // Use userId field as defined in your schema
     const student = await Student.findOne({ userId: user._id });
     if (!student) return notFound(res, "Student not found for this email", 404);
 
-    const sessionDate = new Date(eventTime).toISOString().slice(0, 10);
+    // --- Restrict to only enrolled students ---
+    if (halaka.halqaType === "private") {
+      // Private: only the assigned student can mark attendance
+      if (
+        !halaka.student ||
+        student._id.toString() !== halaka.student.toString()
+      ) {
+        return success(
+          res,
+          null,
+          "Ignored: student is not the enrolled private student."
+        );
+      }
+    } else if (halaka.halqaType === "halqa") {
+      // Group: only students officially enrolled in halaka.students array
+      if (
+        !Array.isArray(halaka.students) ||
+        !halaka.students
+          .map((id) => id.toString())
+          .includes(student._id.toString())
+      ) {
+        return success(res, null, "Ignored: student not in group halaka.");
+      }
+    }
 
+    // --- Match sessionDate as the scheduled date, not join date ---
+    const scheduledSessionDate = getScheduledSessionDate(
+      halaka.schedule,
+      eventTime
+    );
+    if (!scheduledSessionDate) {
+      return error(
+        res,
+        "Could not correlate the Zoom event with a scheduled session for this halaka.",
+        400
+      );
+    }
+    const sessionDateIso = scheduledSessionDate.toISOString().slice(0, 10);
+
+    // --- Attendance write ---
     if (event === "meeting.participant_joined") {
       await upsertAttendance({
         halaka,
-        sessionDate,
+        sessionDate: sessionDateIso,
         studentId: student._id,
         action: "join",
         eventTime,
@@ -89,7 +157,7 @@ export const zoomAttendanceWebhook = async (req, res) => {
     if (event === "meeting.participant_left") {
       await upsertAttendance({
         halaka,
-        sessionDate,
+        sessionDate: sessionDateIso,
         studentId: student._id,
         action: "leave",
         eventTime,
