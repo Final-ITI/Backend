@@ -37,6 +37,7 @@
     "express-validator": "^7.2.1",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.7.1",
     "mongoose": "^8.16.0",
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",

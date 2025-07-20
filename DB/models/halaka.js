@@ -9,8 +9,8 @@ const halakaSchema = new Schema(
     title: { type: String, required: true },
     description: String,
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
-    student: { type: Schema.Types.ObjectId, ref: "Student" },
-    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group
+    students: [{ type: Schema.Types.ObjectId, ref: "Student" }],
+    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group  
     halqaType: { type: String, required: true, enum: ["private", "halqa"] },
     schedule: {
       frequency: {
@@ -111,9 +111,10 @@ halakaSchema.pre("save", async function (next) {
 });
 
 halakaSchema.post("save", async function (doc) {
+  let teacher;
   if (doc._wasNew) {
     try {
-      await mongoose.model("Teacher").findByIdAndUpdate(
+      teacher = await mongoose.model("Teacher").findByIdAndUpdate(
         doc.teacher,
         { $addToSet: { halakat: doc._id } } // $addToSet prevents duplicates
       );
@@ -128,7 +129,12 @@ halakaSchema.post("save", async function (doc) {
       await Enrollment.create({
         student: doc.student,
         halaka: doc._id,
-        status: "pending_action", // The initial state for an invitation
+        status: "pending_action",
+        snapshot: {
+          halakaTitle: doc.title,
+          halakaType: doc.halqaType,
+          pricePerStudent: teacher.sessionPrice,
+        },
       });
 
       // Here you would also trigger the notification service
