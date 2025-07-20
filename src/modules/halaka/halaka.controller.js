@@ -1,4 +1,4 @@
-import Halaka from "../../../DB/models/halaka.js";
+import Halaka, { getAllSessionDates } from "../../../DB/models/halaka.js";
 import {
   created,
   error,
@@ -202,24 +202,40 @@ export const getHalakatByTeacher = async (req, res) => {
 
 //session
 // Get upcoming sessions for a specific Halaka
+// Update your existing getUpcomingSessions function
 export const getUpcomingSessions = async (req, res) => {
-  const halaka = await Halaka.findById(req.params.id);
-  if (!halaka) return notFound(res, "Halaka not found");
-  const sessions = halaka.getUpcomingSessions(5);
-  const now = new Date();
-  const sessionsWithStatus = sessions.map((session) => {
-    const start = new Date(
-      session.scheduledDate + "T" + session.scheduledStartTime
-    );
-    const end = new Date(
-      session.scheduledDate + "T" + session.scheduledEndTime
-    );
-    let status = "scheduled";
-    if (now >= start && now <= end) status = "in-progress";
-    if (now > end) status = "completed";
-    return { ...session, status };
-  });
-  return success(res, sessionsWithStatus, "Next session list");
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka) return notFound(res, "Halaka not found or not yours");
+
+    const sessions = halaka.getUpcomingSessions(5);
+    const now = new Date();
+
+    const formattedSessions = sessions.map((session) => ({
+      scheduledDate: session.scheduledDate,
+      scheduledStartTime: session.scheduledStartTime,
+      scheduledEndTime: session.scheduledEndTime,
+      zoomMeeting: session.zoomMeeting,
+      status: session.isCancelled
+        ? "canceled"
+        : session.scheduledDate < now
+        ? "finished"
+        : "upcoming",
+    }));
+
+    return success(res, "Upcoming sessions", formattedSessions);
+  } catch (err) {
+    console.error(err);
+    return error(res, "Server error");
+  }
 };
 
 //attendance
@@ -399,5 +415,254 @@ export const getAllHalakat = async (req, res) => {
   } catch (err) {
     console.log(err);
     return error(res, "Failed to fetch Halakat", 500, err);
+  }
+};
+
+//session cancelation
+
+const yyyymmdd = (d) => new Date(d).toISOString().slice(0, 10);
+
+/* -------------------------------------------------- *
+ * Cancel Session                                     *
+ * -------------------------------------------------- */
+export const cancelSession = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) return error(res, "Teacher not found", 403);
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka) return notFound(res, "Halaka not found or not yours");
+
+    /* Validate input ------------------------------------------------ */
+    if (!req.body.sessionDate)
+      return error(res, "sessionDate is required", 400);
+
+    const reqDate = yyyymmdd(req.body.sessionDate);
+
+    /* Build full session list incl. already-cancelled slots --------- */
+    const need =
+      (halaka.totalSessions || 0) + (halaka.cancelledSessions?.length || 0);
+    const dates = getAllSessionDates(halaka.schedule, need);
+
+    const match = dates.find((d) => yyyymmdd(d) === reqDate);
+    if (!match)
+      return error(
+        res,
+        "Session date is not a valid upcoming scheduled session",
+        400
+      );
+
+    if (
+      halaka.cancelledSessions?.some((c) => yyyymmdd(c.sessionDate) === reqDate)
+    )
+      return error(res, "Session was already cancelled", 400);
+
+    /* Record cancellation ------------------------------------------ */
+    halaka.cancelledSessions.push({
+      sessionDate: match,
+      reason: req.body.reason || "",
+      cancelledBy: teacher._id,
+    });
+
+    /* Recalculate endDate & save ----------------------------------- */
+    const newNeed =
+      (halaka.totalSessions || 0) + halaka.cancelledSessions.length;
+    const extDates = getAllSessionDates(halaka.schedule, newNeed);
+    halaka.schedule.endDate = extDates[extDates.length - 1];
+    halaka.markModified("schedule"); // tell Mongoose nested field changed
+    await halaka.save();
+
+    return success(
+      res,
+      {
+        cancelledSession: { sessionDate: match, reason: req.body.reason || "" },
+        newEndDate: halaka.schedule.endDate,
+      },
+      "Session cancelled and schedule updated"
+    );
+  } catch (err) {
+    console.error("Cancel Session Error:", err);
+    return error(res, "Failed to cancel session", 500, err);
+  }
+};
+
+/* -------------------------------------------------- *
+ * Session Analytics                                  *
+ * -------------------------------------------------- */
+const findOriginalEndDate = (start, daysArr, total) => {
+  let cur = new Date(start),
+    cnt = 0;
+  while (cnt < total) {
+    const d = cur.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    if (daysArr.includes(d)) cnt++;
+    if (cnt < total) cur.setDate(cur.getDate() + 1);
+  }
+  return cur;
+};
+
+export const getSessionAnalytics = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) return error(res, "Teacher not found", 403);
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+    if (!halaka) return notFound(res, "Halaka not found or not yours");
+
+    const cancelledCnt = halaka.cancelledSessions?.length || 0;
+    const fullList = getAllSessionDates(
+      halaka.schedule,
+      (halaka.totalSessions || 0) + cancelledCnt
+    );
+
+    const completedCnt = halaka.attendance.filter(
+      (a) => yyyymmdd(a.sessionDate) <= yyyymmdd(new Date())
+    ).length;
+
+    const analytics = {
+      totalSessions: halaka.totalSessions,
+      scheduledSessions: fullList.length,
+      cancelledSessions: cancelledCnt,
+      completedSessions: completedCnt,
+      remainingSessions: fullList.length - completedCnt,
+      extended: fullList.length > halaka.totalSessions,
+      originalEndDate: findOriginalEndDate(
+        halaka.schedule.startDate,
+        halaka.schedule.days,
+        halaka.totalSessions
+      ),
+      currentEndDate: halaka.schedule.endDate,
+    };
+
+    return success(res, analytics, "Session analytics generated");
+  } catch (err) {
+    console.error("Analytics Error:", err);
+    return error(res, "Failed to generate session analytics", 500, err);
+  }
+};
+
+//restore and get
+// Get cancelled sessions for a halaka
+export const getCancelledSessions = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    })
+      .populate("cancelledSessions.cancelledBy", "userId")
+      .populate({
+        path: "cancelledSessions.cancelledBy",
+        populate: {
+          path: "userId",
+          select: "firstName lastName",
+        },
+      });
+
+    if (!halaka) {
+      return notFound(res, "Halaka not found or not yours");
+    }
+
+    const cancelledSessions = halaka.cancelledSessions.map((cancelled) => ({
+      sessionDate: cancelled.sessionDate,
+      cancelledAt: cancelled.cancelledAt,
+      reason: cancelled.reason,
+      cancelledBy: cancelled.cancelledBy?.userId
+        ? `${cancelled.cancelledBy.userId.firstName} ${cancelled.cancelledBy.userId.lastName}`
+        : "Unknown",
+    }));
+
+    return success(
+      res,
+      {
+        halaka: {
+          id: halaka._id,
+          title: halaka.title,
+        },
+        cancelledSessions,
+        totalCancelled: cancelledSessions.length,
+        originalEndDate: halaka.totalSessions
+          ? findOriginalEndDate(
+              halaka.schedule.startDate,
+              halaka.schedule.days,
+              halaka.totalSessions
+            )
+          : null,
+        extendedEndDate: halaka.schedule.endDate,
+      },
+      "Cancelled sessions fetched successfully"
+    );
+  } catch (err) {
+    console.error("Get Cancelled Sessions Error:", err);
+    return error(res, "Failed to fetch cancelled sessions", 500, err);
+  }
+};
+
+// Restore a cancelled session (optional feature)
+export const restoreSession = async (req, res) => {
+  try {
+    const { sessionDate } = req.body;
+
+    if (!sessionDate) {
+      return validationError(res, ["Session date is required"]);
+    }
+
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "Teacher not found", 403);
+    }
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    });
+
+    if (!halaka) {
+      return notFound(res, "Halaka not found or not yours");
+    }
+
+    // Find and remove the cancelled session
+    const sessionDateObj = new Date(sessionDate);
+    const cancelledIndex = halaka.cancelledSessions.findIndex(
+      (cancelled) =>
+        cancelled.sessionDate.toISOString().slice(0, 10) ===
+        sessionDateObj.toISOString().slice(0, 10)
+    );
+
+    if (cancelledIndex === -1) {
+      return error(res, "Session was not cancelled", 400);
+    }
+
+    // Remove from cancelled sessions
+    halaka.cancelledSessions.splice(cancelledIndex, 1);
+
+    // Recalculate end date (may shrink the schedule)
+    const newEndDate = halaka.calculateExtendedEndDate();
+    halaka.schedule.endDate = newEndDate;
+
+    await halaka.save();
+
+    return success(
+      res,
+      {
+        halaka: halaka._id,
+        restoredSessionDate: sessionDate,
+        newEndDate: newEndDate,
+        cancelledSessionsCount: halaka.cancelledSessions.length,
+      },
+      "Session restored successfully"
+    );
+  } catch (err) {
+    console.error("Restore Session Error:", err);
+    return error(res, "Failed to restore session", 500, err);
   }
 };

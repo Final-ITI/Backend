@@ -143,3 +143,26 @@ export const updateHalakaValidation = [
     .isIn(["scheduled", "active", "completed", "cancelled"])
     .withMessage("Invalid status"),
 ];
+
+export const cancelSessionValidation = [
+  body("sessionDate")
+    .notEmpty()
+    .withMessage("Session date is required")
+    .isISO8601()
+    .withMessage("Session date must be a valid date (YYYY-MM-DD format)"),
+
+  body("reason")
+    .optional()
+    .isString()
+    .withMessage("Reason must be a string")
+    .isLength({ max: 500 })
+    .withMessage("Reason cannot exceed 500 characters"),
+];
+
+export const restoreSessionValidation = [
+  body("sessionDate")
+    .notEmpty()
+    .withMessage("Session date is required")
+    .isISO8601()
+    .withMessage("Session date must be a valid date (YYYY-MM-DD format)"),
+];

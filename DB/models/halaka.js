@@ -2,16 +2,24 @@ import mongoose from "mongoose";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
 
-const Schema = mongoose.Schema;
+const { Schema } = mongoose;
 
+/* ------------------------------------------------------------------ */
+/*  MAIN SCHEMA                                                       */
+/* ------------------------------------------------------------------ */
 const halakaSchema = new Schema(
   {
+    /*  Basic Info  */
     title: { type: String, required: true },
     description: String,
+
+    /*  Relations   */
     teacher: { type: Schema.Types.ObjectId, ref: "Teacher", required: true },
-    student: { type: Schema.Types.ObjectId, ref: "Student" }, // For private halakas
-    students: [{ type: Schema.Types.ObjectId, ref: "Student" }], // For group halakas
-    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" }, // Reference to chat group
+    student: { type: Schema.Types.ObjectId, ref: "Student" }, // private
+    students: [{ type: Schema.Types.ObjectId, ref: "Student" }], // group
+    chatGroup: { type: Schema.Types.ObjectId, ref: "ChatGroup" },
+
+    /*  Type & Schedule  */
     halqaType: { type: String, required: true, enum: ["private", "halqa"] },
     schedule: {
       frequency: {
@@ -39,20 +47,26 @@ const halakaSchema = new Schema(
       endDate: { type: Date, required: true },
       timezone: { type: String, default: "Africa/Cairo" },
     },
+
+    /*  Business fields  */
     curriculum: {
       type: String,
-      enum: ["quran_memorization", "tajweed", "arabic", "islamic_studies"],
       required: true,
+      enum: ["quran_memorization", "tajweed", "arabic", "islamic_studies"],
     },
     maxStudents: { type: Number, default: 15 },
     currentStudents: { type: Number, default: 0 },
+    price: { type: Number, required: true },
+
+    /*  Zoom info  */
     zoomMeeting: {
       meetingId: String,
       password: String,
       joinUrl: String,
       startUrl: String,
     },
-    price: { type: Number, required: true },
+
+    /*  Statistics  */
     totalSessions: { type: Number },
     totalPrice: { type: Number },
     status: {
@@ -60,6 +74,8 @@ const halakaSchema = new Schema(
       enum: ["scheduled", "active", "completed", "cancelled"],
       default: "scheduled",
     },
+
+    /*  Attendance & Cancellations  */
     attendance: [
       {
         sessionDate: Date,
@@ -77,110 +93,168 @@ const halakaSchema = new Schema(
         ],
       },
     ],
+    cancelledSessions: [
+      {
+        sessionDate: { type: Date, required: true },
+        cancelledAt: { type: Date, default: Date.now },
+        reason: { type: String, default: "" },
+        cancelledBy: {
+          type: Schema.Types.ObjectId,
+          ref: "Teacher",
+          required: true,
+        },
+      },
+    ],
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-// Pre-save: Create Zoom meeting
+/* ------------------------------------------------------------------ */
+/*  HOOKS                                                             */
+/* ------------------------------------------------------------------ */
 halakaSchema.pre("save", async function (next) {
   this._wasNew = this.isNew;
-  if (this.isNew) {
-    try {
-      // Calculate total sessions and price if schedule and price are set
-      if (this.schedule && this.price) {
-        const sessions = countAllSessions(this.schedule);
-        this.totalSessions = sessions;
-        this.totalPrice = sessions * this.price;
-      }
-      // Generate recurrence object based on schedule
-      const recurrence = getRecurrenceFromSchedule(this.schedule);
-      const zoomMeeting = await createZoomMeeting({
-        topic: this.title,
-        start_time: this.schedule.startDate.toISOString(),
-        duration: this.schedule.duration,
-        timezone: this.schedule.timezone,
-        password: Math.random().toString(36).slice(-8),
-        recurrence,
-      });
-      this.zoomMeeting = zoomMeeting;
-    } catch (error) {
-      console.error("Zoom meeting creation failed:", error);
-      return next(error);
-    }
+  if (!this.isNew) return next();
+
+  // totalSessions & totalPrice
+  const sessions = countAllSessions(this.schedule);
+  this.totalSessions = sessions;
+  this.totalPrice = sessions * this.price;
+
+  // create Zoom meeting
+  try {
+    const zoomRecurrence = getRecurrenceFromSchedule(this.schedule);
+    this.zoomMeeting = await createZoomMeeting({
+      topic: this.title,
+      start_time: this.schedule.startDate.toISOString(),
+      duration: this.schedule.duration,
+      timezone: this.schedule.timezone,
+      password: Math.random().toString(36).slice(-8),
+      recurrence: zoomRecurrence,
+    });
+  } catch (err) {
+    return next(err);
   }
+
   next();
 });
 
 halakaSchema.post("save", async function (doc) {
-  let teacher;
-  if (doc._wasNew) {
-    try {
-      teacher = await mongoose
-        .model("Teacher")
-        .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
-    } catch (error) {
-      console.error("❌ Error updating teacher's halakat:", error);
-    }
-  }
+  if (!doc._wasNew) return;
 
-  if (doc.isNew && doc.type === "private" && doc.student) {
-    try {
-      const Enrollment = mongoose.model("Enrollment");
-      await Enrollment.create({
-        student: doc.student,
-        halaka: doc._id,
-        status: "pending_action",
-        snapshot: {
-          halakaTitle: doc.title,
-          halakaType: doc.halqaType,
-          pricePerStudent: teacher.sessionPrice,
-        },
-      });
+  // add halaka → teacher.halakat[]
+  await mongoose
+    .model("Teacher")
+    .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
 
-      // Here you would also trigger the notification service
-      // sendNotification(doc.student, 'You have a new private halaka invitation!');
-    } catch (error) {
-      console.error("Failed to create enrollment for private halaka:", error);
-    }
+  // auto-enrol single student for private halaka
+  if (doc.halqaType === "private" && doc.student) {
+    const Enrollment = mongoose.model("Enrollment");
+    await Enrollment.create({
+      student: doc.student,
+      halaka: doc._id,
+      status: "pending_action",
+      snapshot: {
+        halakaTitle: doc.title,
+        halakaType: doc.halqaType,
+      },
+    });
   }
 });
 
+/* ------------------------------------------------------------------ */
+/*  INSTANCE METHODS                                                  */
+/* ------------------------------------------------------------------ */
+halakaSchema.methods.isSessionCancelled = function (d) {
+  const s = new Date(d).toISOString().slice(0, 10);
+  return this.cancelledSessions.some(
+    (c) => c.sessionDate.toISOString().slice(0, 10) === s
+  );
+};
+
 halakaSchema.methods.getUpcomingSessions = function (
-  count = 5,
-  fromDate = new Date()
+  limit = 5,
+  from = new Date()
 ) {
   const sessions = [];
-  let currentDate = new Date(fromDate);
-  const endDate = new Date(this.schedule.endDate);
-  let added = 0;
+  let current = new Date(from);
+  const end = new Date(this.schedule.endDate);
 
-  // Loop until you've found as many as requested or reach end date
-  while (currentDate <= endDate && added < count) {
-    const dayName = currentDate
+  while (current <= end && sessions.length < limit) {
+    const dayName = current
       .toLocaleString("en-US", { weekday: "long" })
       .toLowerCase();
+
     if (
       this.schedule.days.includes(dayName) &&
-      currentDate >= new Date(this.schedule.startDate)
+      current >= new Date(this.schedule.startDate)
     ) {
+      const isCancelled = this.isSessionCancelled(current);
+
       sessions.push({
-        scheduledDate: new Date(currentDate),
+        scheduledDate: new Date(current),
         scheduledStartTime: this.schedule.startTime,
         scheduledEndTime: calculateEndTime(
           this.schedule.startTime,
           this.schedule.duration
         ),
         zoomMeeting: this.zoomMeeting,
+        isCancelled: isCancelled, // new field
       });
-      added += 1;
     }
-    currentDate.setDate(currentDate.getDate() + 1);
+
+    current.setDate(current.getDate() + 1);
   }
+
   return sessions;
 };
 
+halakaSchema.methods.calculateExtendedEndDate = function () {
+  const originalTotal = this.totalSessions || 0;
+  const cancelledCount = this.cancelledSessions?.length || 0;
+  const needed = originalTotal + cancelledCount;
+  return findNewEndDate(this.schedule.startDate, this.schedule.days, needed);
+};
+/* ------------------------------------------------------------------ */
+/*  STATIC / UTILITY FUNCTIONS                                        */
+/* ------------------------------------------------------------------ */
+export function calculateEndTime(start, duration = 0) {
+  const [h, m] = start.split(":").map(Number);
+  const total = h * 60 + (m || 0) + duration;
+  const eh = Math.floor((total % (24 * 60)) / 60);
+  const em = total % 60;
+  return `${eh.toString().padStart(2, "0")}:${em.toString().padStart(2, "0")}`;
+}
+
+export function countAllSessions(schedule) {
+  let count = 0;
+  let cur = new Date(schedule.startDate);
+  const end = new Date(schedule.endDate);
+
+  while (cur <= end) {
+    const d = cur.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    if (schedule.days.includes(d)) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+export function getAllSessionDates(schedule, needed) {
+  const dates = [];
+  let cur = new Date(schedule.startDate);
+  let guard = 0;
+
+  while (dates.length < needed && guard < 1000) {
+    const d = cur.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    if (schedule.days.includes(d)) dates.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+    guard++;
+  }
+  return dates;
+}
+
 function getRecurrenceFromSchedule(schedule) {
-  const daysMap = {
+  const dayMap = {
     sunday: 1,
     monday: 2,
     tuesday: 3,
@@ -190,38 +264,23 @@ function getRecurrenceFromSchedule(schedule) {
     saturday: 7,
   };
   return {
-    type: 2, // for weekly recurrence
+    type: 2,
     repeat_interval: 1,
-    weekly_days: schedule.days.map((day) => daysMap[day]).join(","),
-    end_date_time: schedule.endDate.toISOString(), // expects a Date
+    weekly_days: schedule.days.map((d) => dayMap[d]).join(","),
+    end_date_time: schedule.endDate.toISOString(),
   };
 }
 
-function calculateEndTime(startTime, duration) {
-  const [hours, minutes] = startTime.split(":").map(Number);
-  let totalMinutes = hours * 60 + (minutes || 0) + (duration || 0);
-  totalMinutes = totalMinutes % (24 * 60);
-  const endHours = Math.floor(totalMinutes / 60);
-  const endMinutes = totalMinutes % 60;
-  return `${endHours.toString().padStart(2, "0")}:${endMinutes
-    .toString()
-    .padStart(2, "0")}`;
-}
-
-function countAllSessions(schedule) {
-  let count = 0;
-  let currentDate = new Date(schedule.startDate);
-  const endDate = new Date(schedule.endDate);
-  const allowedDays = schedule.days;
-  while (currentDate <= endDate) {
-    const dayName = currentDate
-      .toLocaleString("en-US", { weekday: "long" })
-      .toLowerCase();
-    if (allowedDays.includes(dayName)) count++;
-    currentDate.setDate(currentDate.getDate() + 1);
+function findNewEndDate(start, daysArr, sessionsNeeded) {
+  let cur = new Date(start);
+  let cnt = 0;
+  while (cnt < sessionsNeeded) {
+    const d = cur.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    if (daysArr.includes(d)) cnt++;
+    if (cnt < sessionsNeeded) cur.setDate(cur.getDate() + 1);
   }
-  return count;
+  return cur;
 }
-const Halaka = mongoose.models.Halaka || mongoose.model("Halaka", halakaSchema);
 
+const Halaka = mongoose.models.Halaka || mongoose.model("Halaka", halakaSchema);
 export default Halaka;

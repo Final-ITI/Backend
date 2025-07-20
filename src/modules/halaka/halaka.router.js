@@ -8,6 +8,10 @@ import {
   getHalakatByTeacher,
   getUpcomingSessions,
   getHalakaAttendance,
+  cancelSession,
+  getCancelledSessions,
+  restoreSession,
+  getSessionAnalytics,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -57,5 +61,38 @@ router.get(
   authenticate,
   authorize("teacher"),
   getHalakaAttendance
+);
+
+//session cancelation
+// Cancel a specific session
+router.post(
+  "/:id/cancel-session",
+  authenticate,
+  authorize("teacher"),
+  cancelSession
+);
+
+// Get cancelled sessions for a halaka
+router.get(
+  "/:id/cancelled-sessions",
+  authenticate,
+  authorize("teacher"),
+  getCancelledSessions
+);
+
+// Restore a cancelled session
+router.post(
+  "/:id/restore-session",
+  authenticate,
+  authorize("teacher"),
+  restoreSession
+);
+
+// Get session analytics for a specific Halaka
+router.get(
+  "/:id/session-analytics",
+  authenticate,
+  authorize("teacher"),
+  getSessionAnalytics
 );
 export default router;
