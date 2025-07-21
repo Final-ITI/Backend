@@ -1,597 +1,678 @@
 # Halaka API Documentation
 
-_Last updated: July 20, 2025_
+## Overview
 
-Base Route: `/api/v1/halaka`
-
----
+The Halaka API provides comprehensive endpoints for managing Islamic study circles (Halakat). The system supports both private (one-on-one) and group study sessions with features including scheduling, attendance tracking, session management, and analytics.
 
 ## Table of Contents
 
-- [General Notes](#general-notes)
-- [Create Halaka](#create-halaka)
-- [Update Halaka](#update-halaka)
-- [Delete Halaka](#delete-halaka)
-- [Get All Halakat (With Advanced Filtering)](#get-all-halakat-with-advanced-filtering)
-- [Get Halaka By ID](#get-halaka-by-id)
-- [Get Halakat By Teacher](#get-halakat-by-teacher)
-- [Get Upcoming Sessions](#get-upcoming-sessions)
-- [Get Halaka Attendance](#get-halaka-attendance)
-- [Validation and Authorization](#validation-and-authorization)
+- [Authentication](#authentication)
+- [Base Information](#base-information)
+- [Halaka Management](#halaka-management)
+- [Session Management](#session-management)
+- [Attendance Management](#attendance-management)
+- [Student Management](#student-management)
+- [Analytics](#analytics)
+- [Error Handling](#error-handling)
+- [Validation](#validation)
 
----
+## Authentication
 
-## General Notes
+All endpoints require JWT authentication unless otherwise specified.
 
-- **All routes require JWT authentication** except for `Get All Halakat`.
-- **Teacher authorization required** for most endpoints.
-- Field/type/validation errors follow a unified structure.
-- `halqaType`: `"private"` for 1-to-1 halakat, `"halqa"` for group halakat.
-- The price for `"private"` halakat is automatically set from the teacher's profile (`sessionPrice`) on create/update.
-- All dates/times are in ISO 8601 (`UTC`) format.
-- Advanced filtering supports flexible teacher name search (first, last, or full name in any order).
+### Headers Required
 
----
+```
+Authorization: Bearer
+Content-Type: application/json
+```
 
-## Create Halaka
+### Roles
+
+- `teacher`: Required for all Halaka management operations
+- Only the teacher who owns a Halaka can perform operations on it
+
+## Base Information
+
+**Base URL:** `/api/v1/halaka`
+
+**Response Format:**
+
+```json
+{
+  "status": "success|created|error|validationError",
+  "message": "Arabic response message",
+  "timestamp": "ISO 8601 timestamp",
+  "data": "Response data in English"
+}
+```
+
+## Halaka Management
+
+### Create Halaka
 
 **POST** `/api/v1/halaka/`
 
-### Description
+Creates a new Halaka. For private sessions, the price is automatically set from the teacher's profile.
 
-Create a new halaka (private or group).
+#### Request Body
 
-- If `halqaType` is `"private"`, the price is auto-set from the teacher's `sessionPrice`.
-- Required body fields depend on halqaType.
-- For group halakat, a chat group is automatically created.
+| Field       | Type   | Required    | Description                            |
+| ----------- | ------ | ----------- | -------------------------------------- |
+| title       | string | Yes         | Halaka title                           |
+| description | string | No          | Halaka description                     |
+| halqaType   | string | Yes         | "private" or "halqa"                   |
+| student     | string | Conditional | Student ID (required for private)      |
+| schedule    | object | Yes         | Schedule configuration                 |
+| curriculum  | string | Yes         | Curriculum type                        |
+| maxStudents | number | Conditional | Max students (required for group)      |
+| price       | number | Conditional | Price per session (required for group) |
 
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Request Body
-
-```json
-{
-  "title": "حلقة لحفظ جزء عم",
-  "description": "خاص بالطلاب المبتدئين",
-  "halqaType": "halqa", // or "private"
-  "schedule": {
-    "frequency": "weekly",
-    "days": ["monday", "wednesday"],
-    "startTime": "17:00",
-    "duration": 60,
-    "startDate": "2025-09-01T00:00:00.000Z",
-    "endDate": "2025-12-01T00:00:00.000Z",
-    "timezone": "Africa/Cairo"
-  },
-  "curriculum": "quran_memorization",
-  "maxStudents": 10,
-  "price": 100 // required for "halqa" only
-}
-```
-
-#### Required / Conditional Fields
-
-| Field       | Type   | Required? | Notes                                                    |
-| ----------- | ------ | --------- | -------------------------------------------------------- |
-| title       | string | Yes       |                                                          |
-| description | string | No        |                                                          |
-| halqaType   | string | Yes       | "private" \| "halqa"                                     |
-| schedule    | object | Yes       | See above                                                |
-| curriculum  | string | Yes       | (see below for options)                                  |
-| maxStudents | int    | Yes\*     | Required if `halqaType` = "halqa"                        |
-| student     | string | Yes\*     | studentId, required if `halqaType` = "private"           |
-| price       | number | Yes\*     | required if `halqaType` = "halqa", ignored for "private" |
-
-> `curriculum`: `"quran_memorization"`, `"tajweed"`, `"arabic"`, `"islamic_studies"`
-
-**Special Behavior**
-
-- If `halqaType` = `"private"`:
-  - The `student` field is required.
-  - The `price` field is ignored; will be auto-set from the teacher model's `sessionPrice`.
-  - `maxStudents` is automatically set to 1.
-- If `halqaType` = `"halqa"`:
-  - The `maxStudents` and `price` must be provided.
-  - A chat group is automatically created and linked to the halaka.
-
-### Success Response
-
-- **Code:** `201 CREATED`
-- **Content:**
+#### Schedule Object
 
 ```json
 {
-  "status": "created",
-  "message": "Halaka created successfully",
-  "data": {
-    "_id": "60ff234...",
-    "title": "حلقة لحفظ جزء عم",
-    "teacher": "6091f8a...",
-    "halqaType": "halqa",
-    "schedule": { ... },
-    "curriculum": "quran_memorization",
-    "maxStudents": 10,
-    "currentStudents": 0,
-    "price": 100,
-    "status": "scheduled",
-    "chatGroup": "6092a1b..." // for group halakat only
-  }
+  "frequency": "weekly",
+  "days": ["monday", "wednesday"],
+  "startTime": "17:00",
+  "duration": 60,
+  "startDate": "2025-08-01T00:00:00.000Z",
+  "endDate": "2025-10-31T00:00:00.000Z",
+  "timezone": "Africa/Cairo"
 }
 ```
 
----
-
-## Update Halaka
-
-**PUT** `/api/v1/halaka/:id`
-
-### Description
-
-Update fields for an existing halaka.
-
-- For `"private"` halakat, price will always be set to the teacher's `sessionPrice` (even if sent in the request).
-- Only the teacher who created the halaka can update it.
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Request Body
-
-Provide any fields you wish to change (all optional):
+#### Example Request (Group Halaka)
 
 ```json
 {
-  "title": "حلقة جديدة",
-  "description": "تحديث الشرح",
-  "schedule": {
-    "frequency": "weekly",
-    "days": ["sunday"],
-    "startTime": "18:00",
-    "duration": 90
-  },
-  "curriculum": "tajweed",
-  "maxStudents": 10,
-  "price": 120,
-  "status": "active"
-}
-```
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Halaka updated successfully",
-  "data": {
-    "_id": "60ff234...",
-    "title": "حلقة جديدة"
-    // ...updated fields...
-  }
-}
-```
-
----
-
-## Delete Halaka
-
-**DELETE** `/api/v1/halaka/:id`
-
-### Description
-
-Deletes a halaka and all related sessions. Only the assigned teacher may delete.
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Halaka and all related data deleted successfully"
-}
-```
-
----
-
-## Get All Halakat (With Advanced Filtering)
-
-**GET** `/api/v1/halaka/`
-
-### Description
-
-Get all halakat with advanced filtering and pagination capabilities.
-
-- **No authentication required** for this endpoint.
-- Supports flexible teacher name search (first, last, or full name in any order).
-- Full pagination support with metadata.
-
-### Query Parameters
-
-| Parameter     | Type   | Description                                                                                  | Example                   |
-| ------------- | ------ | -------------------------------------------------------------------------------------------- | ------------------------- |
-| `title`       | String | Filter by (substring, case-insensitive) Halaka title                                         | `title=Quran`             |
-| `curriculum`  | String | Filter by curriculum name                                                                    | `curriculum=hafs`         |
-| `status`      | String | Filter by status (`"scheduled"`, `"active"`, `"completed"`, `"cancelled"`)                   | `status=active`           |
-| `teacher`     | String | Filter by teacher ObjectId (exact match)                                                     | `teacher=60ab...c9f6`     |
-| `teacherName` | String | Filter by teacher's first, last, or full name (flexible: `nesma`, `fayed`, or `nesma fayed`) | `teacherName=nesma fayed` |
-| `page`        | Int    | Page number for pagination (default: 1)                                                      | `page=1`                  |
-| `limit`       | Int    | Page size (default: 10)                                                                      | `limit=5`                 |
-
-### Flexible Name Search (`teacherName`)
-
-Supports searching by **first name**, **last name**, or **full name** in any order:
-
-- `teacherName=nesma` matches teachers whose first/last name contains "nesma"
-- `teacherName=nesma fayed` matches:
-  - Teachers with `firstName` ≈ "nesma" and `lastName` ≈ "fayed"
-  - Teachers with `firstName` ≈ "fayed" and `lastName` ≈ "nesma"
-  - Teachers where full name (first or last) contains the string
-
-### Example Requests
-
-- Get page 1, 5 per page, filter by title:
-  ```
-  GET /api/v1/halaka?title=Quran&limit=5&page=1
-  ```
-- Filter by teacher full name:
-  ```
-  GET /api/v1/halaka?teacherName=nesma fayed
-  ```
-- Combined filters:
-  ```
-  GET /api/v1/halaka?curriculum=hafs&status=active&teacherName=ahmed&page=2&limit=10
-  ```
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Data retrieved successfully",
-  "timestamp": "2025-07-20T01:28:17.000Z",
-  "data": [
-    {
-      "_id": "60ff234...",
-      "title": "Quran for Beginners",
-      "curriculum": "hafs",
-      "status": "active",
-      "teacher": {
-        "_id": "6091f8a...",
-        "userId": "6081d2b..."
-        // ...teacher details populated...
-      }
-      // ...other halaka fields...
-    }
-  ],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 1,
-    "totalItems": 1,
-    "itemsPerPage": 10,
-    "hasNext": false,
-    "hasPrev": false
-  }
-}
-```
-
----
-
-## Get Halaka By ID
-
-**GET** `/api/v1/halaka/:id`
-
-### Description
-
-Fetch one halaka by Mongo id. Teacher must own the halaka.
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Halaka fetched successfully",
-  "data": {
-    "_id": "60ff234...",
-    "title": "حلقة لحفظ جزء عم",
-    "teacher": "6091f8a...",
-    "halqaType": "halqa"
-    // ...complete halaka object...
-  }
-}
-```
-
----
-
-## Get Halakat By Teacher
-
-**GET** `/api/v1/halaka/teacher/:teacherId`
-
-### Description
-
-Fetch all halakat for the authenticated teacher (uses teacher from JWT token, not URL parameter).
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Halakat fetched successfully",
-  "data": [
-    {
-      "_id": "60ff234...",
-      "title": "حلقة لحفظ جزء عم"
-      // ...halaka1...
-    },
-    {
-      "_id": "60ff235...",
-      "title": "حلقة التجويد"
-      // ...halaka2...
-    }
-  ]
-}
-```
-
----
-
-## Get Upcoming Sessions
-
-**GET** `/api/v1/halaka/:id/next-sessions`
-
-### Description
-
-Get the next 5 scheduled sessions for a specific halaka with real-time status calculation.
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Next session list",
-  "data": [
-    {
-      "scheduledDate": "2025-09-01T00:00:00.000Z",
-      "scheduledStartTime": "17:00",
-      "scheduledEndTime": "18:00",
-      "zoomMeeting": {
-        "meetingId": "123456789",
-        "joinUrl": "https://zoom.us/j/123456789",
-        "password": "abc123"
-      },
-      "status": "scheduled" // or "upcoming/in-progress"/"completed" or cancelled
-    }
-    // ...up to 5 sessions...
-  ]
-}
-```
-
-### Session Status Logic
-
-- `"scheduled"`: Session is in the future
-- `"in-progress"`: Current time is between start and end time
-- `"completed"`: Session end time has passed
-
----
-
-## Get Halaka Attendance
-
-**GET** `/api/v1/halaka/:id/attendance?date=YYYY-MM-DD` (optional date filter)
-
-### Description
-
-Get attendance records for a specific halaka (per student per session).
-
-### Request Headers
-
-- `Authorization: Bearer <token>`
-
-### Query Parameters
-
-- `date` (optional): Filter by session date (ISO format YYYY-MM-DD)
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "message": "Attendance data fetched",
-  "data": [
-    {
-      "sessionDate": "2025-10-01T00:00:00.000Z",
-      "records": [
-        {
-          "student": {
-            "id": "65325e84...",
-            "firstName": "Omar",
-            "lastName": "Saeed",
-            "email": "omar@example.com"
-          },
-          "status": "present", // or "absent"
-          "timeIn": "2025-10-01T17:05:00.000Z",
-          "timeOut": "2025-10-01T18:00:00.000Z"
-        }
-        // ...more student records...
-      ]
-    }
-    // ...more session dates...
-  ]
-}
-```
-
----
-
-## Validation and Authorization
-
-- Most endpoints require authentication via JWT token in Authorization header.
-- **Teacher role is enforced** on all CRUD endpoints except `Get All Halakat`.
-- Teachers can only access/modify their own halakat (except for the public listing).
-- Detailed validation error messages are returned for all bad or missing data.
-- All ObjectId values must be valid MongoDB IDs.
-
-### Validation Rules
-
-#### Create Halaka
-
-- `title`: Required, string
-- `halqaType`: Required, must be "private" or "halqa"
-- `schedule`: Required object with valid date/time fields
-- `curriculum`: Required, must be one of predefined values
-- `price`: Required for group halakat, positive number
-- `maxStudents`: Required for group halakat, positive integer
-- `student`: Required for private halakat, valid ObjectId
-
-#### Update Halaka
-
-- All fields optional
-- Same validation rules apply when fields are provided
-- Private halaka prices are automatically overridden
-
----
-
-## Error/Validation Response
-
-```json
-{
-  "status": "validationError" | "error",
-  "message": "Description of the error",
-  "errors": [ "field-specific errors if any" ]
-}
-```
-
-### Common Error Codes
-
-- **400 Bad Request**: Validation errors or missing required fields
-- **401 Unauthorized**: Missing or invalid JWT token
-- **403 Forbidden**: Insufficient permissions (not a teacher, or not owner)
-- **404 Not Found**: Halaka not found or not accessible
-- **500 Internal Server Error**: Server-side errors
-
----
-
-## Example: Create Group Halaka
-
-```http
-POST /api/v1/halaka/
-Authorization: Bearer <your-jwt-token>
-Content-Type: application/json
-
-{
-  "title": "حفظ سورة الكهف",
+  "title": "Advanced Tajweed Course",
+  "description": "Learn advanced Tajweed rules",
   "halqaType": "halqa",
   "schedule": {
     "frequency": "weekly",
-    "days": ["friday"],
+    "days": ["sunday", "tuesday"],
     "startTime": "18:00",
     "duration": 90,
     "startDate": "2025-08-01T00:00:00.000Z",
     "endDate": "2025-12-01T00:00:00.000Z",
     "timezone": "Africa/Cairo"
   },
-  "curriculum": "quran_memorization",
+  "curriculum": "tajweed",
   "maxStudents": 15,
   "price": 150
 }
 ```
 
-## Example: Create Private Halaka
+#### Success Response
 
-```http
-POST /api/v1/halaka/
-Authorization: Bearer <your-jwt-token>
-Content-Type: application/json
-
+```json
 {
-  "title": "حلقة خصوصية",
-  "halqaType": "private",
-  "student": "64b63a...studentId...",
-  "schedule": {
-    "frequency": "weekly",
-    "days": ["sunday"],
-    "startTime": "16:00",
-    "duration": 60,
-    "startDate": "2025-08-01T00:00:00.000Z",
-    "endDate": "2025-10-01T00:00:00.000Z",
-    "timezone": "Africa/Cairo"
-  },
-  "curriculum": "tajweed"
-}
-```
-
-## Example: Advanced Filtering
-
-```http
-GET /api/v1/halaka?teacherName=ahmed ali&curriculum=quran_memorization&status=active&page=1&limit=10
-```
-
-## Example: Get Attendance for Specific Date
-
-```http
-GET /api/v1/halaka/60ff234.../attendance?date=2025-10-01
-Authorization: Bearer <your-jwt-token>
-```
-
----
-
-## Frontend Integration Tips
-
-### Next.js/React Example
-
-```javascript
-// Get filtered halakat with pagination
-const getHalakat = async (filters = {}) => {
-  const params = new URLSearchParams(filters).toString();
-  const response = await fetch(`/api/v1/halaka?${params}`);
-  return response.json();
-};
-
-// Usage
-const data = await getHalakat({
-  teacherName: "ahmed",
-  curriculum: "quran_memorization",
-  page: 1,
-  limit: 10,
-});
-```
-
-### Error Handling Pattern
-
-```javascript
-try {
-  const response = await fetch("/api/v1/halaka", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  "status": "created",
+  "message": "تم إنشاء الحلقة بنجاح",
+  "timestamp": "2025-07-21T14:30:00.000Z",
+  "data": {
+    "_id": "60f1234567890abcdef12345",
+    "title": "Advanced Tajweed Course",
+    "description": "Learn advanced Tajweed rules",
+    "halqaType": "halqa",
+    "status": "scheduled",
+    "curriculum": "tajweed",
+    "schedule": {
+      "frequency": "weekly",
+      "days": ["sunday", "tuesday"],
+      "startTime": "18:00",
+      "duration": 90,
+      "startDate": "2025-08-01T00:00:00.000Z",
+      "endDate": "2025-12-01T00:00:00.000Z",
+      "timezone": "Africa/Cairo"
     },
-    body: JSON.stringify(halakaData),
-  });
-
-  const result = await response.json();
-
-  if (result.status === "created") {
-    // Success
-    console.log("Halaka created:", result.data);
-  } else {
-    // Handle validation or other errors
-    console.error("Error:", result.message);
+    "maxStudents": 15,
+    "currentStudents": 0,
+    "price": 150,
+    "totalSessions": 35,
+    "totalPrice": 5250
   }
-} catch (error) {
-  console.error("Network error:", error);
 }
 ```
+
+### Get All Public Halakat
+
+**GET** `/api/v1/halaka/`
+
+Retrieves all public group Halakat with filtering and pagination.
+
+#### Query Parameters
+
+| Parameter   | Type   | Description                        |
+| ----------- | ------ | ---------------------------------- |
+| page        | number | Page number (default: 1)           |
+| limit       | number | Items per page (default: 10)       |
+| title       | string | Filter by title (case-insensitive) |
+| curriculum  | string | Filter by curriculum               |
+| status      | string | Filter by status                   |
+| teacher     | string | Filter by teacher ID               |
+| teacherName | string | Filter by teacher name             |
+
+#### Example Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب الحلقات بنجاح",
+  "data": [
+    {
+      "id": "60f1234567890abcdef12345",
+      "title": "Advanced Tajweed",
+      "description": "Learn Tajweed rules",
+      "teacher": {
+        "name": "أ. محمد أحمد",
+        "rating": 4.8,
+        "studentsCount": 45,
+        "profileImage": "/uploads/teachers/teacher1.jpg"
+      },
+      "curriculum": "tajweed",
+      "price": 120,
+      "currency": "ج.م",
+      "maxStudents": 20,
+      "currentStudents": 12,
+      "schedule": {
+        "days": ["monday", "wednesday"],
+        "startTime": "19:00",
+        "duration": 60,
+        "frequency": "weekly"
+      },
+      "nextSession": "monday - 19:00",
+      "location": "أونلاين",
+      "status": "active",
+      "halqaType": "halqa"
+    }
+  ],
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 5,
+    "totalItems": 48,
+    "itemsPerPage": 10,
+    "hasNext": true,
+    "hasPrev": false
+  }
+}
+```
+
+### Get Halaka by ID
+
+**GET** `/api/v1/halaka/:id`
+
+Retrieves a specific Halaka. Teacher must own the Halaka.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب بيانات الحلقة بنجاح",
+  "data": {
+    "_id": "60f1234567890abcdef12345",
+    "title": "Quran Memorization Circle",
+    "description": "Memorize and understand Quran",
+    "halqaType": "halqa",
+    "status": "active",
+    "curriculum": "quran_memorization",
+    "schedule": {
+      "frequency": "weekly",
+      "days": ["saturday", "tuesday"],
+      "startTime": "20:00",
+      "duration": 75,
+      "startDate": "2025-08-01T00:00:00.000Z",
+      "endDate": "2025-12-01T00:00:00.000Z",
+      "timezone": "Africa/Cairo"
+    }
+  }
+}
+```
+
+### Update Halaka
+
+**PUT** `/api/v1/halaka/:id`
+
+Updates an existing Halaka. For private Halakat, price is automatically synced with teacher's session price.
+
+#### Request Body
+
+All fields are optional. Include only fields you want to update.
+
+```json
+{
+  "title": "Updated Halaka Title",
+  "status": "active",
+  "maxStudents": 25
+}
+```
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم تحديث الحلقة بنجاح",
+  "data": {
+    // Updated halaka object
+  }
+}
+```
+
+### Delete Halaka
+
+**DELETE** `/api/v1/halaka/:id`
+
+Deletes a Halaka and all related sessions and data.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم حذف الحلقة وجميع البيانات المتعلقة بها بنجاح",
+  "data": null
+}
+```
+
+### Get Teacher's Halakat
+
+**GET** `/api/v1/halaka/teacher/me`
+
+Retrieves all Halakat belonging to the authenticated teacher.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب الحلقات بنجاح",
+  "data": [
+    // Array of teacher's Halakat
+  ]
+}
+```
+
+## Session Management
+
+### Get Upcoming Sessions
+
+**GET** `/api/v1/halaka/:id/next-sessions`
+
+Retrieves the next 5 upcoming sessions for a Halaka.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب الجلسات القادمة بنجاح",
+  "data": [
+    {
+      "scheduledDate": "2025-08-01T00:00:00.000Z",
+      "scheduledStartTime": "19:00",
+      "scheduledEndTime": "20:30",
+      "zoomMeeting": {
+        "meetingId": "123456789",
+        "password": "abc123",
+        "joinUrl": "https://zoom.us/j/123456789"
+      },
+      "status": "upcoming"
+    }
+  ]
+}
+```
+
+### Cancel Session
+
+**POST** `/api/v1/halaka/:id/cancel-session`
+
+Cancels a specific session and extends the schedule accordingly.
+
+#### Request Body
+
+```json
+{
+  "sessionDate": "2025-08-15T00:00:00.000Z",
+  "reason": "Emergency leave"
+}
+```
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم إلغاء الجلسة وتحديث الجدول بنجاح",
+  "data": {
+    "cancelledSession": {
+      "sessionDate": "2025-08-15T00:00:00.000Z",
+      "reason": "Emergency leave"
+    },
+    "newEndDate": "2025-12-05T00:00:00.000Z"
+  }
+}
+```
+
+### Get Cancelled Sessions
+
+**GET** `/api/v1/halaka/:id/cancelled-sessions`
+
+Retrieves all cancelled sessions for a Halaka.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب الجلسات الملغاة بنجاح",
+  "data": {
+    "halaka": {
+      "id": "60f1234567890abcdef12345",
+      "title": "Quran Circle"
+    },
+    "cancelledSessions": [
+      {
+        "sessionDate": "2025-08-15T00:00:00.000Z",
+        "cancelledAt": "2025-08-10T15:30:00.000Z",
+        "reason": "Emergency leave",
+        "cancelledBy": "محمد أحمد"
+      }
+    ],
+    "totalCancelled": 1,
+    "originalEndDate": "2025-12-01T00:00:00.000Z",
+    "extendedEndDate": "2025-12-05T00:00:00.000Z"
+  }
+}
+```
+
+### Restore Session
+
+**POST** `/api/v1/halaka/:id/restore-session`
+
+Restores a previously cancelled session.
+
+#### Request Body
+
+```json
+{
+  "sessionDate": "2025-08-15T00:00:00.000Z"
+}
+```
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم استعادة الجلسة بنجاح",
+  "data": {
+    "halaka": "60f1234567890abcdef12345",
+    "restoredSessionDate": "2025-08-15T00:00:00.000Z",
+    "newEndDate": "2025-12-01T00:00:00.000Z",
+    "cancelledSessionsCount": 0
+  }
+}
+```
+
+## Attendance Management
+
+### Get Halaka Attendance
+
+**GET** `/api/v1/halaka/:id/attendance`
+
+Retrieves attendance records for all sessions or a specific date.
+
+#### Query Parameters
+
+| Parameter | Type   | Description                                 |
+| --------- | ------ | ------------------------------------------- |
+| date      | string | Filter by specific date (YYYY-MM-DD format) |
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب بيانات الحضور بنجاح",
+  "data": [
+    {
+      "sessionDate": "2025-08-01T00:00:00.000Z",
+      "records": [
+        {
+          "student": {
+            "id": "60f9876543210abcdef67890",
+            "firstName": "Omar",
+            "lastName": "Mohammed",
+            "email": "omar@example.com",
+            "profilePicture": "/uploads/students/omar.jpg"
+          },
+          "status": "present",
+          "timeIn": "2025-08-01T19:00:00.000Z",
+          "timeOut": "2025-08-01T20:30:00.000Z"
+        },
+        {
+          "student": {
+            "id": "60f9876543210abcdef67891",
+            "firstName": "Fatima",
+            "lastName": "Ahmed",
+            "email": "fatima@example.com",
+            "profilePicture": "/uploads/students/fatima.jpg"
+          },
+          "status": "late",
+          "timeIn": "2025-08-01T19:15:00.000Z",
+          "timeOut": "2025-08-01T20:30:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Student Management
+
+### Get Halaka Students
+
+**GET** `/api/v1/halaka/:id/students`
+
+Retrieves all students enrolled in a specific Halaka.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب طلاب الحلقة بنجاح",
+  "data": [
+    {
+      "id": "60f9876543210abcdef67890",
+      "firstName": "Omar",
+      "lastName": "Mohammed",
+      "email": "omar@example.com",
+      "profilePicture": "/uploads/students/omar.jpg"
+    },
+    {
+      "id": "60f9876543210abcdef67891",
+      "firstName": "Fatima",
+      "lastName": "Ahmed",
+      "email": "fatima@example.com",
+      "profilePicture": "/uploads/students/fatima.jpg"
+    }
+  ]
+}
+```
+
+## Analytics
+
+### Get Session Analytics
+
+**GET** `/api/v1/halaka/:id/session-analytics`
+
+Provides comprehensive session analytics for a Halaka.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم إنشاء تحليلات الجلسات بنجاح",
+  "data": {
+    "totalSessions": 30,
+    "scheduledSessions": 32,
+    "cancelledSessions": 2,
+    "completedSessions": 18,
+    "remainingSessions": 14,
+    "extended": true,
+    "originalEndDate": "2025-11-30T00:00:00.000Z",
+    "currentEndDate": "2025-12-05T00:00:00.000Z"
+  }
+}
+```
+
+### Get Available Enums
+
+**GET** `/api/v1/halaka/enums`
+
+Returns all available enum values for frontend dropdowns.
+
+#### Success Response
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب الخيارات المتاحة بنجاح",
+  "data": {
+    "halqaType": {
+      "halqa": "halqa",
+      "private": "private"
+    },
+    "status": {
+      "scheduled": "scheduled",
+      "active": "active",
+      "completed": "completed",
+      "cancelled": "cancelled"
+    },
+    "curriculum": {
+      "quran_memorization": "quran_memorization",
+      "tajweed": "tajweed",
+      "arabic": "arabic",
+      "islamic_studies": "islamic_studies"
+    },
+    "sessionStatus": {
+      "present": "present",
+      "absent": "absent",
+      "late": "late",
+      "excused": "excused"
+    },
+    "days": {
+      "sunday": "sunday",
+      "monday": "monday",
+      "tuesday": "tuesday",
+      "wednesday": "wednesday",
+      "thursday": "thursday",
+      "friday": "friday",
+      "saturday": "saturday"
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Validation Errors
+
+When validation fails, the API returns detailed Arabic error messages:
+
+```json
+{
+  "status": "validationError",
+  "message": "أخطاء في التحقق من البيانات",
+  "timestamp": "2025-07-21T14:30:00.000Z",
+  "errors": [
+    "حقل «العنوان» مطلوب",
+    "حقل «نوع الحلقة» يجب أن يكون نصًا",
+    "«تاريخ البداية» يجب أن يكون تاريخًا بصيغة ISO 8601"
+  ]
+}
+```
+
+### Common Error Responses
+
+#### Not Found (404)
+
+```json
+{
+  "status": "error",
+  "message": "لم يتم العثور على الحلقة",
+  "timestamp": "2025-07-21T14:30:00.000Z",
+  "data": null
+}
+```
+
+#### Unauthorized (403)
+
+```json
+{
+  "status": "error",
+  "message": "لم يتم العثور على المعلم",
+  "timestamp": "2025-07-21T14:30:00.000Z",
+  "data": null
+}
+```
+
+#### Server Error (500)
+
+```json
+{
+  "status": "error",
+  "message": "خطأ في الخادم",
+  "timestamp": "2025-07-21T14:30:00.000Z",
+  "data": {
+    "error": "Internal server error details"
+  }
+}
+```
+
+### HTTP Status Codes
+
+| Status Code | Arabic Message | Description                    |
+| ----------- | -------------- | ------------------------------ |
+| 200         | تم بنجاح       | Successful operation           |
+| 201         | تم إنشاء بنجاح | Resource created successfully  |
+| 400         | طلب غير صحيح   | Bad request / validation error |
+| 401         | غير مخول       | Unauthorized                   |
+| 403         | ممنوع          | Forbidden                      |
+| 404         | غير موجود      | Resource not found             |
+| 500         | خطأ في الخادم  | Internal server error          |
+
+## Validation
+
+### Field Validation Rules
+
+| Field              | Rules                                  | Arabic Message                                       |
+| ------------------ | -------------------------------------- | ---------------------------------------------------- |
+| title              | Required, string                       | حقل «العنوان» مطلوب                                  |
+| halqaType          | Required, enum: ["private", "halqa"]   | قيمة «نوع الحلقة» غير صحيحة                          |
+| schedule           | Required, object                       | حقل «الجدول» مطلوب                                   |
+| schedule.startDate | Required, ISO8601 date                 | «تاريخ البداية» يجب أن يكون تاريخًا بصيغة ISO 8601   |
+| schedule.endDate   | Required, ISO8601 date                 | «تاريخ النهاية» يجب أن يكون تاريخًا بصيغة ISO 8601   |
+| schedule.days      | Required, array min:1                  | يجب اختيار يوم واحد على الأقل في الجدول              |
+| schedule.startTime | Required, HH:mm format                 | «وقت البداية» يجب أن يكون بتنسيق HH:mm               |
+| schedule.duration  | Required, positive integer             | «المدة» يجب أن يكون رقمًا صحيحًا موجبًا              |
+| curriculum         | Required, enum                         | قيمة «المنهج» غير صحيحة                              |
+| maxStudents        | Required for group, positive integer   | «الحد الأقصى للطلاب» يجب أن يكون رقمًا صحيحًا موجبًا |
+| student            | Required for private, MongoDB ObjectId | «معرّف الطالب» يجب أن يكون ObjectId صحيحًا           |
+| price              | Required for group, positive number    | «السعر» يجب أن يكون رقمًا موجبًا                     |
+
+## Notes
+
+1. **Date Format**: All dates are in ISO 8601 format (UTC)
+2. **Authentication**: JWT token required in Authorization header
+3. **Localization**: Response messages are in Arabic, data fields are in English
+4. **Pagination**: Available on list endpoints with standard pagination parameters
+5. **File Uploads**: Profile pictures use relative paths from upload directory
+6. **Private Halakat**: Price is automatically managed from teacher profile
+7. **Session Extension**: Cancelled sessions automatically extend the schedule
+8. **Zoom Integration**: Automatic meeting creation for all Halakat
