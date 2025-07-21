@@ -92,7 +92,7 @@ const halakaSchema = new Schema(
             },
             timeIn: Date,
             timeOut: Date,
-            score: { type: Number, min: 1, max: 10 }, // Changed from 0-100 to 1-10
+            score: { type: Number, min: 1, max: 5 }, // Changed from 1-10 to 1-5 for star rating
             notes: { type: String, trim: true }, // New field for notes
           },
         ],
