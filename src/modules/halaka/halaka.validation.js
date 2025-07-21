@@ -85,7 +85,7 @@ export const createHalakaValidation = [
     .withMessage(messages.mustBePositiveInt("الحد الأقصى للطلاب")),
 
   // Conditional validation for private halaka
-  body("userId")
+  body("student")
     .if(body("halqaType").equals("private"))
     .notEmpty()
     .withMessage(messages.required("معرّف المستخدم"))
