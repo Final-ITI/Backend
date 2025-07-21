@@ -817,3 +817,199 @@ export const getHalakaEnums = (req, res) => {
     "تم جلب الخيارات المتاحة بنجاح"
   );
 };
+
+/* -------------------------------------------------- *
+ * Halaka Progress (New section)                      *
+ * -------------------------------------------------- */
+export const getHalakaProgress = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "لم يتم العثور على المعلم", 403);
+    }
+    // let halakaId = req.params.id;
+    // console.log("Debugging updateHalakaProgress:");
+    // console.log("req.params.halakaId:", halakaId);
+    // console.log("req.user._id (from auth token):", req.user._id);
+    // console.log("teacher._id (found from user ID):", teacher._id);
+
+
+    const halaka = await Halaka.findOne({
+      _id: req.params.id,
+      teacher: teacher._id,
+    })
+      .populate({
+        path: "students",
+        populate: {
+          path: "userId",
+          select: "firstName lastName _id",
+        },
+      })
+      .populate({
+        path: "student", // For private halakas
+        populate: {
+          path: "userId",
+          select: "firstName lastName _id",
+        },
+      })
+      .populate({
+        path: "attendance.records.student",
+        populate: {
+          path: "userId",
+          select: "firstName lastName _id",
+        },
+      });
+
+    if (!halaka) {
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
+    }
+
+    const allStudents = [];
+    if (halaka.halqaType === "halqa" && halaka.students) {
+      halaka.students.forEach((s) => {
+        if (s && s.userId) {
+          allStudents.push({
+            id: s._id,
+            userId: s.userId._id,
+            firstName: s.userId.firstName,
+            lastName: s.userId.lastName,
+            fullName: `${s.userId.firstName} ${s.userId.lastName}`,
+          });
+        }
+      });
+    } else if (halaka.halqaType === "private" && halaka.student) {
+      if (halaka.student && halaka.student.userId) {
+        allStudents.push({
+          id: halaka.student._id,
+          userId: halaka.student.userId._id,
+          firstName: halaka.student.userId.firstName,
+          lastName: halaka.student.userId.lastName,
+          fullName: `${halaka.student.userId.firstName} ${halaka.student.userId.lastName}`,
+        });
+      }
+    }
+
+    const totalSessions = halaka.totalSessions || 0;
+    const cancelledCount = halaka.cancelledSessions?.length || 0;
+    const allSessionDates = getAllSessionDates(
+      halaka.schedule,
+      totalSessions + cancelledCount
+    );
+
+    const sessionsData = allSessionDates.map((date, index) => {
+      const attendanceEntry = halaka.attendance.find(
+        (att) => att.sessionDate.toISOString().slice(0, 10) === date.toISOString().slice(0, 10)
+      );
+      return {
+        sessionNumber: index + 1,
+        sessionDate: date.toISOString().slice(0, 10),
+        attendanceId: attendanceEntry ? attendanceEntry._id : null, // ID for the attendance document
+      };
+    });
+
+    const studentProgress = allStudents.map((student) => {
+      const studentSessionData = sessionsData.map((session) => {
+        const attendanceEntryForSession = halaka.attendance.find(
+          (att) => att.sessionDate.toISOString().slice(0, 10) === session.sessionDate
+        );
+
+        const attendanceRecord = attendanceEntryForSession?.records.find(
+          (r) => r.student && r.student._id.toString() === student.id.toString()
+        );
+
+        return {
+          sessionNumber: session.sessionNumber,
+          sessionDate: session.sessionDate,
+          status: attendanceRecord?.status || "absent",
+          score: attendanceRecord?.score || null, // Changed default to null for clarity if no score
+          notes: attendanceRecord?.notes || "",
+        };
+      });
+
+      return {
+        studentId: student.id,
+        fullName: student.fullName,
+        progress: studentSessionData,
+      };
+    });
+
+    return success(res, { halakaId: halaka._id, studentProgress, sessionsData }, "تم جلب تقدم الطلاب بنجاح");
+  } catch (err) {
+    console.error("خطأ في جلب تقدم الطلاب:", err);
+    return error(res, "فشل في جلب تقدم الطلاب", 500, err);
+  }
+};
+
+export const updateHalakaProgress = async (req, res) => {
+  try {
+    const halakaId = req.params.id;
+    const { studentId, sessionDate, score, notes } = req.body;
+
+    if (!studentId || !sessionDate) {
+      return validationError(res, ["معرف الطالب وتاريخ الجلسة مطلوبان"]);
+    }
+
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) {
+      return error(res, "لم يتم العثور على المعلم", 403);
+    }
+
+    console.log("Debugging updateHalakaProgress:");
+    console.log("req.params.halakaId:", halakaId);
+    console.log("req.user._id (from auth token):", req.user._id);
+    console.log("teacher._id (found from user ID):", teacher._id);
+
+
+    const halaka = await Halaka.findOne({
+      _id: halakaId,
+      teacher: teacher._id,
+    });
+
+    if (!halaka) {
+      return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
+    }
+
+    const sessionDateObj = new Date(sessionDate);
+    let attendanceEntry = halaka.attendance.find(
+      (att) => att.sessionDate.toISOString().slice(0, 10) === sessionDateObj.toISOString().slice(0, 10)
+    );
+
+    if (!attendanceEntry) {
+      attendanceEntry = {
+        sessionDate: sessionDateObj,
+        records: [],
+      };
+      halaka.attendance.push(attendanceEntry);
+    }
+
+    let studentRecord = attendanceEntry.records.find(
+      (rec) => rec.student.toString() === studentId
+    );
+
+    if (studentRecord) {
+      // Update existing record
+      if (score !== undefined) studentRecord.score = score;
+      if (notes !== undefined) studentRecord.notes = notes;
+    } else {
+      // Create new record
+      attendanceEntry.records.push({
+        student: studentId,
+        score: score || null,
+        notes: notes || "",
+        status: "absent", // Default status as it won't be sent from frontend for now
+      });
+    }
+
+    halaka.markModified('attendance'); // Mark attendance array as modified
+    await halaka.save();
+
+    return success(
+      res,
+      { halakaId, studentId, sessionDate, score, notes }, // Removed status from response
+      "تم تحديث تقدم الطالب بنجاح"
+    );
+  } catch (err) {
+    console.error("خطأ في تحديث تقدم الطالب:", err);
+    return error(res, "فشل في تحديث تقدم الطالب", 500, err);
+  }
+};
