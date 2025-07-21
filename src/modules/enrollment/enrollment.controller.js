@@ -170,9 +170,9 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
   const teacher = halaka && halaka.teacher && halaka.teacher.userId;
   const teacherBio = halaka && halaka.teacher && halaka.teacher.bio;
 
-  return res.status(200).json({
-    success: true,
-    data: {
+  success(
+    res,
+    {
       _id: enrollment._id,
       status: enrollment.status,
       snapshot: enrollment.snapshot,
@@ -188,11 +188,12 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
         ? {
             name: `${teacher.firstName} ${teacher.lastName}`,
             avatar: teacher.profilePicture,
-            bio: teacherBio,
+            bio: teacherBio || "",
           }
         : null,
     },
-  });
+    "تم استرجاع تفاصيل الدعوة بنجاح."
+  );
 });
 
 // PATCH /api/v1/enrollments/invitations/:id - Accept or reject a specific invitation (re-add for single invitation)
@@ -200,7 +201,6 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const enrollmentId = req.params.id;
   const { action } = req.body;
-
 
   // Find the student profile for the logged-in user
   const student = await Student.findOne({ userId }).select("_id");
@@ -227,11 +227,11 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
   if (action === "accept") {
     enrollment.status = "pending_payment";
     await enrollment.save();
-    return res.status(200).json({
-      success: true,
-      message: "Invitation accepted. Please proceed to payment.",
-      data: { _id: enrollment._id, status: enrollment.status },
-    });
+    return success(
+      res,
+      { _id: enrollment._id, status: enrollment.status },
+      "Invitation accepted. Please proceed to payment."
+    );
   } else if (action === "reject") {
     enrollment.status = "cancelled_by_student";
     await enrollment.save();
@@ -258,9 +258,10 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
         notifyErr
       );
     }
-    return res.status(200).json({
-      success: true,
-      message: "Invitation has been successfully rejected.",
-    });
+    success(
+      res,
+      { _id: enrollment._id, status: enrollment.status },
+      "Invitation rejected successfully."
+    );
   }
 });

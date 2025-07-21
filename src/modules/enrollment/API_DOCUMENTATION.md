@@ -68,13 +68,9 @@ fetch("/api/v1/enrollments/group", {
 #### Business Rules
 
 1. **Group Halaka Only**: This endpoint only accepts enrollments for halakas with `halqaType: "halqa"`. Private halakas are handled by separate endpoints.
-
 2. **Availability Check**: The system verifies that the halaka is not full by comparing `currentStudents` with `maxStudents`.
-
 3. **No Duplicate Enrollments**: The system prevents duplicate enrollments by checking if the student already has an enrollment record for this halaka.
-
 4. **Student Profile Required**: The authenticated user must have a valid student profile.
-
 5. **Pre-save Validation**: All business logic validation is handled automatically by the enrollment schema's pre-save hook.
 
 #### Error Responses
@@ -98,6 +94,177 @@ fetch("/api/v1/enrollments/group", {
   "timestamp": "2024-06-01T12:00:00.000Z"
 }
 ```
+
+---
+
+## New: Private Halaka Invitation Endpoints
+
+### 2. List All Pending Invitations
+
+**GET** `/invitations`
+
+Fetch all pending private halaka invitations for the authenticated student.
+
+#### Query Parameters
+
+| Parameter | Type   | Required | Description                    |
+| --------- | ------ | -------- | ------------------------------ |
+| `page`    | number | No       | Page number (default: 1)       |
+| `limit`   | number | No       | Results per page (default: 10) |
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "enrollment_id_123",
+      "status": "pending_action",
+      "snapshot": {
+        "halakaTitle": "Beginner Tajweed Course",
+        "totalPrice": 200,
+        "currency": "EGP"
+      },
+      "halakaDetails": {
+        "_id": "halaka_id_abc",
+        "title": "Beginner Tajweed Course",
+        "schedule": {
+          /* schedule details */
+        }
+      },
+      "teacherDetails": {
+        "name": "Ahmed Mahmoud",
+        "avatar": "url_to_image.jpg"
+      }
+    }
+  ],
+  "total": 1,
+  "message": "تم استرجاع الدعوات المعلقة بنجاح."
+}
+```
+
+#### Business Rules
+
+- Only invitations with status `pending_action` are returned.
+- Only invitations for the authenticated student are returned.
+- Populates halaka and teacher details.
+
+---
+
+### 3. Get Single Invitation Details
+
+**GET** `/invitations/:id`
+
+Fetch the details of a single invitation for the authenticated student.
+
+#### URL Parameters
+
+| Parameter | Type   | Required | Description            |
+| --------- | ------ | -------- | ---------------------- |
+| `id`      | string | Yes      | Enrollment document ID |
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "the_specific_enrollment_id",
+    "status": "pending_action",
+    "snapshot": {
+      "halakaTitle": "Advanced Tajweed Course",
+      "totalPrice": 250,
+      "currency": "EGP"
+    },
+    "halakaDetails": {
+      "_id": "halaka_id_abc",
+      "title": "Advanced Tajweed Course",
+      "description": "A course for advanced students.",
+      "schedule": {
+        /* full schedule object */
+      }
+    },
+    "teacherDetails": {
+      "name": "Fatima Ali",
+      "avatar": "url_to_image.jpg",
+      "bio": "Experienced Quran teacher..."
+    }
+  }
+}
+```
+
+#### Business Rules
+
+- Only the student who owns the invitation can access it.
+- Returns 404 if not found or not owned by the student.
+- Populates halaka and teacher details.
+
+---
+
+### 4. Accept or Reject an Invitation
+
+**PATCH** `/invitations/:id`
+
+Accept or reject a specific invitation.
+
+#### URL Parameters
+
+| Parameter | Type   | Required | Description            |
+| --------- | ------ | -------- | ---------------------- |
+| `id`      | string | Yes      | Enrollment document ID |
+
+#### Request Body
+
+| Parameter | Type   | Required | Description          |
+| --------- | ------ | -------- | -------------------- |
+| `action`  | string | Yes      | "accept" or "reject" |
+
+#### Example Request (Accept)
+
+```json
+{
+  "action": "accept"
+}
+```
+
+#### Example Request (Reject)
+
+```json
+{
+  "action": "reject"
+}
+```
+
+#### Success Response (Accept)
+
+```json
+{
+  "success": true,
+  "message": "Invitation accepted. Please proceed to payment.",
+  "data": {
+    "_id": "the_specific_enrollment_id",
+    "status": "pending_payment"
+  }
+}
+```
+
+#### Success Response (Reject)
+
+```json
+{
+  "success": true,
+  "message": "Invitation has been successfully rejected."
+}
+```
+
+#### Business Rules
+
+- Only the student who owns the invitation can act on it.
+- Only invitations with status `pending_action` can be updated.
+- Accept: status changes to `pending_payment`.
+- Reject: status changes to `cancelled_by_student` and notifies the teacher.
+- Returns 404 if not found or not owned by the student.
 
 ---
 
