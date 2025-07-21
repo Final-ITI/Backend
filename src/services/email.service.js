@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import {
   generateActivationEmail,
   resetPasswordTemp,
+  generateHalakaInvitationEmail,
 } from "../utils/mail/generateHTML.js";
 import { sendEmail } from "../utils/mail/sendMail.js";
 
@@ -36,6 +37,34 @@ export const AuthMailService = {
     await sendEmail({
       to: user.email,
       subject: "Motken Password Reset Code",
+      html,
+    });
+
+    return true;
+  },
+};
+
+export const HalakaMailService = {
+  async sendHalakaInvitationEmail(
+    studentEmail,
+    studentName,
+    teacherName,
+    halakaData,
+    enrollmentLink
+  ) {
+    const html = generateHalakaInvitationEmail(
+      studentName,
+      teacherName,
+      halakaData.title,
+      halakaData.description,
+      halakaData.schedule,
+      halakaData.price,
+      enrollmentLink
+    );
+
+    await sendEmail({
+      to: studentEmail,
+      subject: `دعوة لحلقة خاصة: ${halakaData.title}`,
       html,
     });
 

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import "./teacher.js";
 import { createZoomMeeting } from "../../src/modules/zoom/zoom.service.js";
 import { sendNotification } from "../../src/services/notification.service.js";
+import { HalakaMailService } from "../../src/services/email.service.js";
 import ApiError from "../../src/utils/apiError.js";
 
 const Schema = mongoose.Schema;
@@ -122,17 +123,19 @@ halakaSchema.post("save", async function (doc) {
     return;
   }
 
-  // --- Logic Block 1: Update the teacher's halakat list ---
-  try {
-    await mongoose
-      .model("Teacher")
-      .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
-  } catch (error) {
-    console.error("❌ Error updating teacher's halakat list:", error);
+  let teacher;
+  if (doc._wasNew) {
+    try {
+      teacher = await mongoose
+        .model("Teacher")
+        .findByIdAndUpdate(doc.teacher, { $addToSet: { halakat: doc._id } });
+    } catch (error) {
+      console.error("❌ Error updating teacher's halakat:", error);
+    }
   }
-
   // --- Logic Block 2: Create enrollment and send notification for PRIVATE halaqas ---
-  if (doc.type === "private" && doc.student) {
+  if (doc.halqaType === "private" && doc.student) {
+    console.log("Creating enrollment for private halaka:", doc._id);
     // Use 'type' as we agreed
     try {
       // Fetch all necessary data INSIDE this block to be self-contained
@@ -159,7 +162,7 @@ halakaSchema.post("save", async function (doc) {
         snapshot: {
           halakaTitle: doc.title,
           totalPrice: doc.totalPrice,
-          currency: doc.currency || "EGP", 
+          currency: doc.currency || "EGP",
         },
       });
 
@@ -169,7 +172,10 @@ halakaSchema.post("save", async function (doc) {
         .findById(doc.student)
         .select("userId");
       if (!studentProfile)
-        throw new ApiError("Student profile not found to send notification.", 404);
+        throw new ApiError(
+          "Student profile not found to send notification.",
+          404
+        );
 
       // Send the notification
       await sendNotification({
@@ -179,6 +185,38 @@ halakaSchema.post("save", async function (doc) {
         message: `المعلم ${teacherName} يدعوك للانضمام إلى حلقة "${doc.title}"`,
         link: `/enrollments/invitations/${enrollment._id}`, // A more descriptive link
       });
+
+      // Send email invitation
+      try {
+        // Get student's email from the user document
+        const studentUser = await mongoose
+          .model("User")
+          .findById(studentProfile.userId);
+        if (studentUser && studentUser.email) {
+          const enrollmentLink = `${process.env.FE_URL}/enrollments/invitations/${enrollment._id}`;
+
+          await HalakaMailService.sendHalakaInvitationEmail(
+            studentUser.email,
+            `${studentUser.firstName} ${studentUser.lastName}`,
+            teacherName,
+            {
+              title: doc.title,
+              description: doc.description,
+              schedule: doc.schedule,
+              price: doc.price,
+            },
+            enrollmentLink
+          );
+
+          console.log(
+            "✅ Email invitation sent successfully to:",
+            studentUser.email
+          );
+        }
+      } catch (emailError) {
+        console.error("❌ Failed to send email invitation:", emailError);
+        // Don't throw error here to avoid breaking the main flow
+      }
     } catch (error) {
       console.error(
         "❌ Failed to create enrollment or send notification for private halaka:",
