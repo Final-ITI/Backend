@@ -92,6 +92,8 @@ const halakaSchema = new Schema(
             },
             timeIn: Date,
             timeOut: Date,
+            score: { type: Number, min: 1, max: 5 }, // Changed from 1-10 to 1-5 for star rating
+            notes: { type: String, trim: true }, // New field for notes
           },
         ],
       },
@@ -187,11 +189,12 @@ halakaSchema.post("save", async function (doc) {
         status: "pending_action",
         snapshot: {
           halakaTitle: doc.title,
-          totalPrice: doc.totalPrice,
+          pricePerStudent: doc.totalPrice,
+          pricePerSession: doc.price,
           currency: doc.currency || "EGP",
         },
       });
-
+      console.log("✅ Enrollment created for private halaka:", enrollment._id);
       // Find the student's main user ID to send the notification to
       const studentProfile = await mongoose
         .model("Student")

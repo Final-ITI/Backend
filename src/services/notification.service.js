@@ -13,20 +13,24 @@ import { io, userSocketMap } from "../socket/socket.js"; // استيراد io و
  */
 export const sendNotification = async (notificationData) => {
   try {
-    // 1. Save the notification to the database (for persistence)
+    // 1. Save the notification to the database
     const notification = await Notification.create(notificationData);
 
-    // 2. Attempt to send a real-time notification via Socket.IO
-    const receiverSocketId = userSocketMap[notification.recipient];
+    // 2. Attempt to send a real-time notification
+    // Convert the recipient's ObjectId to a string before looking it up
+    const recipientIdString = notification.recipient.toString();
+    const receiverSocketId = userSocketMap[recipientIdString];
+    
     if (receiverSocketId && io) {
-      // We use a general event name 'new_notification'
+      console.log(`Sending notification to user ${recipientIdString} via socket ${receiverSocketId}`);
       io.to(receiverSocketId).emit("new_notification", notification);
+    } else {
+      console.log(`User ${recipientIdString} is not online. Notification saved to DB.`);
     }
     
     return notification;
 
   } catch (error) {
     console.error("Error sending notification:", error);
-    // We don't throw an error here to avoid stopping the main process
   }
 };

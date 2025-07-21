@@ -9,7 +9,6 @@ import {
 
 export const getNotifications = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  console.log("User ID:", userId); // 687c80ac9541ceb133cea87b
   const { page = 1, isRead, type } = req.query;
   const limit = 10;
   // Build filter object
