@@ -13,8 +13,10 @@ import {
   restoreSession,
   getSessionAnalytics,
   getHalakaStudents,
+  getTeacherDashboardStats,
   getHalakaProgress, // Import new function
   updateHalakaProgress, // Import new function
+
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -32,6 +34,12 @@ router.post(
   authorize("teacher"),
   validate(createHalakaValidation),
   createHalaka
+);
+router.get(
+  "/dashboard",
+  authenticate,
+  authorize("teacher"),
+  getTeacherDashboardStats
 );
 
 router.get("/", getAllHalakat);
@@ -107,6 +115,15 @@ router.get(
   getSessionAnalytics
 );
 
+
+// Get teacher dashboard stats
+router.get(
+  "/dashboard",
+  authenticate,
+  authorize("teacher"),
+  getTeacherDashboardStats
+);
+
 // Halaka Progress Routes
 router.get(
   "/:id/progress",
@@ -121,5 +138,6 @@ router.put(
   authorize("teacher"),
   updateHalakaProgress
 );
+
 
 export default router;

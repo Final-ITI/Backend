@@ -11,6 +11,7 @@ import Session from "../../../DB/models/session.js";
 import { paginated } from "../../utils/apiResponse.js";
 import User from "../../../DB/models/user.js";
 import Student from "../../../DB/models/student.js";
+import Enrollment from "../../../DB/models/enrollment.js";
 
 //teacher
 
@@ -427,6 +428,71 @@ export const getAllHalakat = async (req, res) => {
   }
 };
 
+export const getTeacherDashboardStats = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) return error(res, "لم يتم العثور على المعلم", 403);
+
+    // 1. All halakat by this teacher
+    const allHalakat = await Halaka.find({ teacher: teacher._id });
+
+    // 2. Count total halakat
+    const totalHalakat = allHalakat.length;
+
+    // 3. All halaka IDs
+    const halakaIds = allHalakat.map((h) => h._id);
+
+    // 4. All enrollments for these halakat with status "active"
+    const enrollments = await Enrollment.find({
+      halaka: { $in: halakaIds },
+      status: "active",
+    }).select("student");
+
+    // 5. Unique student IDs (group + private)
+    const uniqueStudentIds = new Set(enrollments.map((e) => String(e.student)));
+    // Add direct student for private halakat (if not enrolled)
+    allHalakat.forEach((h) => {
+      if (h.halqaType === "private" && h.student)
+        uniqueStudentIds.add(String(h.student));
+    });
+
+    const numberOfStudents = uniqueStudentIds.size;
+
+    // 6. Halakat of the current day (any halaka scheduled for today)
+    const today = new Date();
+    const todayDay = today
+      .toLocaleString("en-US", { weekday: "long" })
+      .toLowerCase();
+    const halakatToday = allHalakat.filter((h) =>
+      h.schedule.days.includes(todayDay)
+    ).length;
+
+    // 7. Teaching hours in week
+    // For each halaka, if it has a day in ["sunday",..."saturday"], and frequency is weekly or more, add (number of sessions in week * duration)
+    let weekHours = 0;
+    allHalakat.forEach((h) => {
+      let freq = h.schedule.frequency || "weekly";
+      let daysPerWeek = h.schedule.days.length;
+      let weeklyMultiplier =
+        freq === "daily" ? 7 : freq === "biweekly" ? 0.5 : 1;
+      weekHours +=
+        (daysPerWeek * (h.schedule.duration || 0) * weeklyMultiplier) / 60;
+    });
+
+    return success(
+      res,
+      {
+        totalHalakat,
+        numberOfStudents,
+        halakatToday,
+        weekHours: Math.round(weekHours * 10) / 10, // (decimal hours, 1 place)
+      },
+      "تم جلب إحصائيات لوحة المعلم بنجاح"
+    );
+  } catch (err) {
+    return error(res, "فشل في جلب إحصائيات لوحة المعلم", 500, err);
+  }
+};
 //-----------------------------------------------------------------------------------------------------
 
 /* -------------------------------------------------- *
