@@ -113,7 +113,28 @@ export const getHalakaDetails = async (req, res) => {
         const teacher = halaka.teacher;
         const user = teacher?.userId;
 
-        const allSessionDates = getAllSessionDates(halaka.schedule, halaka.totalSessions || 0);
+        // Get all session dates, considering total sessions and cancelled ones to show full history
+        const totalSessionsConsidered = (halaka.totalSessions || 0) + (halaka.cancelledSessions?.length || 0);
+        const allSessionDates = getAllSessionDates(halaka.schedule, totalSessionsConsidered);
+
+        const myProgress = allSessionDates.map((date, index) => {
+            const attendanceEntry = halaka.attendance.find(
+                (att) => att.sessionDate.toISOString().slice(0, 10) === date.toISOString().slice(0, 10)
+            );
+
+            const myRecord = attendanceEntry?.records.find(
+                (r) => r.student && r.student._id.toString() === student._id.toString()
+            );
+
+            return {
+                sessionNumber: index + 1,
+                sessionDate: date.toISOString().slice(0, 10),
+                status: myRecord?.status || 'absent',
+                score: myRecord?.score || null,
+                notes: myRecord?.notes || '',
+                isCancelled: halaka.isSessionCancelled(date),
+            };
+        });
 
         const attendance = (halaka.attendance || []).map(a => {
             const record = a.records.find(r => r.student?.toString() === student._id.toString());
@@ -150,7 +171,8 @@ export const getHalakaDetails = async (req, res) => {
             finishedSessions,
             upcomingSessions,
             zoomMeeting: halaka.zoomMeeting,
-            chatGroup: halaka.chatGroup, 
+            chatGroup: halaka.chatGroup, // Already added, keeping it
+            myProgress, // Add student's personal progress here
         };
 
         return success(res, result, 'تم جلب تفاصيل الحلقة بنجاح');

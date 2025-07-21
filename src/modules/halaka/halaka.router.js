@@ -13,6 +13,8 @@ import {
   restoreSession,
   getSessionAnalytics,
   getHalakaStudents,
+  getHalakaProgress, // Import new function
+  updateHalakaProgress, // Import new function
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -103,6 +105,21 @@ router.get(
   authenticate,
   authorize("teacher"),
   getSessionAnalytics
+);
+
+// Halaka Progress Routes
+router.get(
+  "/:id/progress",
+  authenticate,
+  authorize("teacher"),
+  getHalakaProgress
+);
+
+router.put(
+  "/:id/progress",
+  authenticate,
+  authorize("teacher"),
+  updateHalakaProgress
 );
 
 export default router;
