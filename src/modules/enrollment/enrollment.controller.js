@@ -9,6 +9,7 @@ import { asyncHandler } from "../../utils/apiError.js";
 import Enrollment from "../../../DB/models/enrollment.js";
 import Halaka from "../../../DB/models/halaka.js";
 import Student from "../../../DB/models/student.js";
+import { EnrollmentService } from "./enrollment.service.js";
 
 export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const { id: halakaId } = req.body;
@@ -81,187 +82,107 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   );
 });
 
+// --- Controllers ---
+
 // GET /api/v1/enrollments/invitations - List all pending invitations for the logged-in student
 export const getPendingInvitations = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-
-  // Find the student profile for the logged-in user
   const student = await Student.findOne({ userId }).select("_id");
   if (!student) return notFound(res, "Student profile not found");
 
-  // Query for pending_action enrollments
-  const filter = { student: student._id, status: "pending_action" };
+  // Pagination
+  const features = new (await import("../../utils/apiFeatures.js")).default(
+    Enrollment.find({
+      student: student._id,
+      status: "pending_action",
+    }).populate(EnrollmentService.invitationPopulation),
+    req.query
+  )
+    .sort()
+    .paginate();
+  const enrollments = await features.query;
 
-  const enrollments = await Enrollment.find(filter)
-    .populate({
-      path: "halaka",
-      select: "title schedule teacher",
-      populate: {
-        path: "teacher",
-        select: "userId",
-        populate: {
-          path: "userId",
-          select: "firstName lastName profilePicture",
-        },
-      },
-    })
-    .sort({ createdAt: -1 });
-
-  // Format response
-  const data = enrollments.map((enrollment) => {
-    const halaka = enrollment.halaka;
-    const teacher = halaka && halaka.teacher && halaka.teacher.userId;
-    return {
-      _id: enrollment._id,
-      status: enrollment.status,
-      snapshot: enrollment.snapshot,
-      halakaDetails: halaka
-        ? {
-            _id: halaka._id,
-            title: halaka.title,
-            schedule: halaka.schedule,
-          }
-        : null,
-      teacherDetails: teacher
-        ? {
-            name: `${teacher.firstName} ${teacher.lastName}`,
-            avatar: teacher.profilePicture,
-          }
-        : null,
-    };
+  // Total count for pagination
+  const total = await Enrollment.countDocuments({
+    student: student._id,
+    status: "pending_action",
   });
 
-  return success(
-    res,
-    { data, total: enrollments.length },
-    "تم استرجاع الدعوات المعلقة بنجاح."
-  );
+  // Format response
+  const data = enrollments.map(EnrollmentService.formatInvitation);
+
+  return success(res, { data, total }, "تم استرجاع الدعوات المعلقة بنجاح.");
 });
 
 // GET /api/v1/enrollments/invitations/:id - Get single invitation details for the authenticated student
 export const getInvitationDetails = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const enrollmentId = req.params.id;
-
-  // Find the student profile for the logged-in user
   const student = await Student.findOne({ userId }).select("_id");
   if (!student) return notFound(res, "Student profile not found");
 
-  // Find the enrollment and populate halaka and teacher details
   const enrollment = await Enrollment.findOne({
     _id: enrollmentId,
     student: student._id,
-  }).populate({
-    path: "halaka",
-    select: "title description schedule teacher",
-    populate: {
-      path: "teacher",
-      select: "userId bio",
-      populate: {
-        path: "userId",
-        select: "firstName lastName profilePicture",
-      },
-    },
-  });
+  }).populate(EnrollmentService.invitationPopulation);
 
   if (!enrollment) return notFound(res, "Invitation not found");
 
-  const halaka = enrollment.halaka;
-  const teacher = halaka && halaka.teacher && halaka.teacher.userId;
-  const teacherBio = halaka && halaka.teacher && halaka.teacher.bio;
-
-  success(
+  return success(
     res,
-    {
-      _id: enrollment._id,
-      status: enrollment.status,
-      snapshot: enrollment.snapshot,
-      halakaDetails: halaka
-        ? {
-            _id: halaka._id,
-            title: halaka.title,
-            description: halaka.description,
-            schedule: halaka.schedule,
-          }
-        : null,
-      teacherDetails: teacher
-        ? {
-            name: `${teacher.firstName} ${teacher.lastName}`,
-            avatar: teacher.profilePicture,
-            bio: teacherBio || "",
-          }
-        : null,
-    },
+    EnrollmentService.formatInvitation(enrollment),
     "تم استرجاع تفاصيل الدعوة بنجاح."
   );
 });
 
-// PATCH /api/v1/enrollments/invitations/:id - Accept or reject a specific invitation (re-add for single invitation)
+// PATCH /api/v1/enrollments/invitations/:id - Accept or reject a specific invitation
 export const actOnInvitation = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const enrollmentId = req.params.id;
+  const { _id: userId } = req.user;
+  const { id: enrollmentId } = req.params;
   const { action } = req.body;
 
-  // Find the student profile for the logged-in user
+  // Get student profile
   const student = await Student.findOne({ userId }).select("_id");
   if (!student) return notFound(res, "Student profile not found");
 
-  // Find the enrollment
+  // Get enrollment with populated data
   const enrollment = await Enrollment.findOne({
     _id: enrollmentId,
     student: student._id,
     status: "pending_action",
-  }).populate({
-    path: "halaka",
-    select: "teacher",
-    populate: {
-      path: "teacher",
-      select: "userId",
-      populate: { path: "userId", select: "firstName lastName profilePicture" },
-    },
-  });
+  }).populate(EnrollmentService.invitationPopulation);
 
-  if (!enrollment)
+  if (!enrollment) {
     return notFound(res, "Invitation not found or already actioned");
-
-  if (action === "accept") {
-    enrollment.status = "pending_payment";
-    await enrollment.save();
-    return success(
-      res,
-      { _id: enrollment._id, status: enrollment.status },
-      "Invitation accepted. Please proceed to payment."
-    );
-  } else if (action === "reject") {
-    enrollment.status = "cancelled_by_student";
-    await enrollment.save();
-    // Notify the teacher (optional but recommended)
-    try {
-      const teacherUser =
-        enrollment.halaka &&
-        enrollment.halaka.teacher &&
-        enrollment.halaka.teacher.userId;
-      if (teacherUser && teacherUser._id) {
-        const { sendNotification } = await import(
-          "../../services/notification.service.js"
-        );
-        await sendNotification({
-          recipient: teacherUser._id,
-          type: "halaka_invitation_rejected",
-          message: `تم رفض دعوة الحلقة من قبل الطالب.`,
-          link: `/halakat/${enrollment.halaka._id}`,
-        });
-      }
-    } catch (notifyErr) {
-      console.error(
-        "Failed to send rejection notification to teacher:",
-        notifyErr
-      );
-    }
-    success(
-      res,
-      { _id: enrollment._id, status: enrollment.status },
-      "Invitation rejected successfully."
-    );
   }
+
+  // Process the invitation action (accept/reject)
+  const actionMap = {
+    accept: {
+      status: "pending_payment",
+      message: "Invitation accepted. Please proceed to payment.",
+    },
+    reject: {
+      status: "cancelled_by_student",
+      message: "Invitation rejected successfully.",
+    },
+  };
+
+  const { status, message } = actionMap[action];
+  enrollment.status = status;
+  await enrollment.save();
+
+  const result = {
+    data: { _id: enrollment._id, status: enrollment.status },
+    message,
+  };
+
+  // Send notification to teacher (fire and forget)
+  EnrollmentService.sendTeacherNotification(enrollment, action).catch((err) =>
+    console.error(`Failed to send ${action} notification to teacher:`, err)
+  );
+
+  return success(res, result.data, result.message);
 });
+
+
