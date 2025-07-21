@@ -15,6 +15,7 @@ import webhookRouter from "./modules/webhook/webhook.router.js";
 import enrollmentRouter from "./modules/enrollment/enrollment.router.js";
 import notificationRouter from "./modules/notification/notification.router.js";
 import reviewRouter from "./modules/review/review.router.js";
+import studentRouter from "./modules/student/student.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -44,6 +45,7 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/enrollments", enrollmentRouter);
   app.use("/api/v1/notifications", notificationRouter);
   app.use("/api/v1/reviews", reviewRouter);
+  app.use("/api/v1/student", studentRouter);
 
   // 404 handler
   app.use(notFoundHandler);
