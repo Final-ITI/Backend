@@ -3,6 +3,7 @@ import {
   notFound,
   validationError,
   error,
+  success,
 } from "../../utils/apiResponse.js";
 import { asyncHandler } from "../../utils/apiError.js";
 import Enrollment from "../../../DB/models/enrollment.js";
@@ -42,7 +43,6 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
     },
   });
 
-
   // --- Activate ChatGroup integration ---
   // Add the student's userId to the halaka's chatGroup participants if not already present
   if (halaka.chatGroup) {
@@ -70,7 +70,7 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const paymentDetails = {
     enrollmentId: enrollment._id,
     amount: halaka.totalPrice,
-    currency: enrollment.snapshot.currency ,
+    currency: enrollment.snapshot.currency,
     description: `Enrollment in: ${halaka.title}`,
   };
 
@@ -78,5 +78,62 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
     res,
     paymentDetails,
     "Enrollment initiated. Please proceed to payment."
+  );
+});
+
+// GET /api/v1/enrollments/invitations - List all pending invitations for the logged-in student
+export const getPendingInvitations = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  // Find the student profile for the logged-in user
+  const student = await Student.findOne({ userId }).select("_id");
+  if (!student) return notFound(res, "Student profile not found");
+
+  // Query for pending_action enrollments
+  const filter = { student: student._id, status: "pending_action" };
+
+  const enrollments = await Enrollment.find(filter)
+    .populate({
+      path: "halaka",
+      select: "title schedule teacher",
+      populate: {
+        path: "teacher",
+        select: "userId",
+        populate: {
+          path: "userId",
+          select: "firstName lastName profilePicture",
+        },
+      },
+    })
+    .sort({ createdAt: -1 });
+
+  // Format response
+  const data = enrollments.map((enrollment) => {
+    const halaka = enrollment.halaka;
+    const teacher = halaka && halaka.teacher && halaka.teacher.userId;
+    return {
+      _id: enrollment._id,
+      status: enrollment.status,
+      snapshot: enrollment.snapshot,
+      halakaDetails: halaka
+        ? {
+            _id: halaka._id,
+            title: halaka.title,
+            schedule: halaka.schedule,
+          }
+        : null,
+      teacherDetails: teacher
+        ? {
+            name: `${teacher.firstName} ${teacher.lastName}`,
+            avatar: teacher.profilePicture,
+          }
+        : null,
+    };
+  });
+
+  return success(
+    res,
+    { data, total: enrollments.length },
+    "تم استرجاع الدعوات المعلقة بنجاح."
   );
 });

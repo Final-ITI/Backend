@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 import { isValidObjectId } from "../../middlewares/validation.middleware.js";
 
 export const enrollInHalakaValidation = [
@@ -13,4 +13,17 @@ export const enrollInHalakaValidation = [
     .withMessage("Invalid Halaka ID format.")
     .trim()
     .escape(),
+];
+
+export const actOnInvitationValidation = [
+  param("id")
+    .notEmpty()
+    .withMessage("Enrollment ID is required.")
+    .custom((value) => isValidObjectId(value))
+    .withMessage("Invalid Enrollment ID format."),
+  body("action")
+    .notEmpty()
+    .withMessage("Action is required.")
+    .isIn(["accept", "reject"])
+    .withMessage("Action must be either 'accept' or 'reject'."),
 ];
