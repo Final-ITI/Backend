@@ -10,13 +10,6 @@ import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
 import { paginated } from "../../utils/apiResponse.js";
 import User from "../../../DB/models/user.js";
-import {
-  HALQA_TYPE_AR,
-  STATUS_AR,
-  SESSION_STATUS_AR,
-  CURRICULUM_AR,
-  DAY_AR,
-} from "./ar.js";
 
 //teacher
 
@@ -110,19 +103,7 @@ export const createHalaka = async (req, res) => {
       }
     }
 
-    // Transform response to Arabic
-    const arabicHalaka = {
-      ...halaka.toObject(),
-      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
-      status: STATUS_AR[halaka.status] || halaka.status,
-      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
-      schedule: {
-        ...halaka.schedule,
-        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
-      },
-    };
-
-    return created(res, arabicHalaka, "تم إنشاء الحلقة بنجاح");
+    return created(res, halaka, "تم إنشاء الحلقة بنجاح");
   } catch (err) {
     console.error("❌ خطأ في إنشاء الحلقة:", err);
     return error(res, "خطأ في الخادم", 500, err);
@@ -163,19 +144,7 @@ export const updateHalaka = async (req, res) => {
 
     await halaka.save();
 
-    // Transform response to Arabic
-    const arabicHalaka = {
-      ...halaka.toObject(),
-      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
-      status: STATUS_AR[halaka.status] || halaka.status,
-      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
-      schedule: {
-        ...halaka.schedule,
-        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
-      },
-    };
-
-    return success(res, arabicHalaka, "تم تحديث الحلقة بنجاح");
+    return success(res, halaka, "تم تحديث الحلقة بنجاح");
   } catch (err) {
     return error(res, "فشل في تحديث الحلقة", 500, err);
   }
@@ -195,19 +164,7 @@ export const getHalakaById = async (req, res) => {
     if (!halaka)
       return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
-    // Transform response to Arabic
-    const arabicHalaka = {
-      ...halaka.toObject(),
-      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
-      status: STATUS_AR[halaka.status] || halaka.status,
-      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
-      schedule: {
-        ...halaka.schedule,
-        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
-      },
-    };
-
-    return success(res, arabicHalaka, "تم جلب بيانات الحلقة بنجاح");
+    return success(res, halaka, "تم جلب بيانات الحلقة بنجاح");
   } catch (err) {
     return error(res, "فشل في جلب بيانات الحلقة", 500, err);
   }
@@ -256,19 +213,7 @@ export const getHalakatByTeacher = async (req, res) => {
       createdAt: -1,
     });
 
-    // Transform response to Arabic
-    const arabicHalakat = halakat.map((halaka) => ({
-      ...halaka.toObject(),
-      halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
-      status: STATUS_AR[halaka.status] || halaka.status,
-      curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
-      schedule: {
-        ...halaka.schedule,
-        days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
-      },
-    }));
-
-    return success(res, arabicHalakat, "تم جلب الحلقات بنجاح");
+    return success(res, halakat, "تم جلب الحلقات بنجاح");
   } catch (err) {
     return error(res, "فشل في جلب الحلقات", 500, err);
   }
@@ -420,7 +365,6 @@ export const getAllHalakat = async (req, res) => {
         populate: { path: "userId", select: "firstName lastName profileImage" },
       });
 
-    // Transform each Halaka to Arabic format
     const transformed = halakat.map((halaka) => {
       const teacher = halaka.teacher;
       const user = teacher?.userId;
@@ -436,21 +380,21 @@ export const getAllHalakat = async (req, res) => {
           studentsCount: teacher?.performance?.totalStudents ?? 0,
           profileImage: user?.profileImage ?? "/default-profile.jpg",
         },
-        curriculum: CURRICULUM_AR[halaka.curriculum] || halaka.curriculum,
+        curriculum: halaka.curriculum,
         price: halaka.price,
         currency: "ج.م",
         maxStudents: halaka.maxStudents,
         currentStudents: halaka.currentStudents,
         schedule: {
-          days: halaka.schedule.days.map((day) => DAY_AR[day] || day),
+          days: halaka.schedule.days,
           startTime: halaka.schedule.startTime,
           duration: halaka.schedule.duration,
           frequency: halaka.schedule.frequency,
         },
         nextSession: getNextSessionText(halaka.schedule),
         location: "أونلاين",
-        status: STATUS_AR[halaka.status] || halaka.status,
-        halqaType: HALQA_TYPE_AR[halaka.halqaType] || halaka.halqaType,
+        status: halaka.status,
+        halqaType: halaka.halqaType,
       };
     });
 
@@ -464,7 +408,7 @@ export const getAllHalakat = async (req, res) => {
       hasPrev: page > 1,
     };
 
-    return paginated(res, transformed, paginationInfo);
+    return paginated(res, transformed, paginationInfo, "تم جلب الحلقات بنجاح");
   } catch (err) {
     console.log(err);
     return error(res, "فشل في جلب الحلقات", 500, err);
@@ -499,11 +443,11 @@ export const getUpcomingSessions = async (req, res) => {
     const now = new Date();
 
     const formattedSessions = sessions.map((session) => {
-      let status = "قادمة";
+      let status = "upcoming";
       if (session.isCancelled) {
-        status = "ملغاة";
+        status = "cancelled";
       } else if (session.scheduledDate < now) {
-        status = "منتهية";
+        status = "completed";
       }
 
       return {
@@ -542,7 +486,7 @@ export const getHalakaAttendance = async (req, res) => {
         (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
       );
 
-    // Format each record for name and student ID with Arabic status
+    // Format each record for name and student ID (keep status in English)
     const formatted = attendance.map((a) => ({
       sessionDate: a.sessionDate,
       records: a.records.map((r) => {
@@ -557,7 +501,7 @@ export const getHalakaAttendance = async (req, res) => {
               profilePicture:
                 stu.userId.profilePicture || "/default-profile.jpg",
             },
-            status: SESSION_STATUS_AR[r.status] || r.status,
+            status: r.status,
             timeIn: r.timeIn,
             timeOut: r.timeOut,
           }
@@ -838,11 +782,37 @@ export const getHalakaEnums = (req, res) => {
   return success(
     res,
     {
-      halqaType: HALQA_TYPE_AR,
-      status: STATUS_AR,
-      curriculum: CURRICULUM_AR,
-      sessionStatus: SESSION_STATUS_AR,
-      days: DAY_AR,
+      halqaType: {
+        halqa: "halqa",
+        private: "private",
+      },
+      status: {
+        scheduled: "scheduled",
+        active: "active",
+        completed: "completed",
+        cancelled: "cancelled",
+      },
+      curriculum: {
+        quran_memorization: "quran_memorization",
+        tajweed: "tajweed",
+        arabic: "arabic",
+        islamic_studies: "islamic_studies",
+      },
+      sessionStatus: {
+        present: "present",
+        absent: "absent",
+        late: "late",
+        excused: "excused",
+      },
+      days: {
+        sunday: "sunday",
+        monday: "monday",
+        tuesday: "tuesday",
+        wednesday: "wednesday",
+        thursday: "thursday",
+        friday: "friday",
+        saturday: "saturday",
+      },
     },
     "تم جلب الخيارات المتاحة بنجاح"
   );

@@ -13,7 +13,6 @@ import {
   restoreSession,
   getSessionAnalytics,
   getHalakaStudents,
-  getHalakaEnums,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -32,9 +31,6 @@ router.post(
   validate(createHalakaValidation),
   createHalaka
 );
-
-//enums
-router.get("/enums", getHalakaEnums);
 
 router.get("/", getAllHalakat);
 router.get("/:id", authenticate, authorize("teacher"), getHalakaById);
