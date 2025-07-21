@@ -103,7 +103,8 @@ export const getHalakaDetails = async (req, res) => {
             .populate({
                 path: 'teacher',
                 populate: { path: 'userId', select: 'firstName lastName profileImage bio' }
-            });
+            })
+            .populate('chatGroup');
 
         if (!halaka) {
             return notFound(res, 'الحلقة غير موجودة أو أنك لست مسجلاً فيها');
@@ -149,6 +150,7 @@ export const getHalakaDetails = async (req, res) => {
             finishedSessions,
             upcomingSessions,
             zoomMeeting: halaka.zoomMeeting,
+            chatGroup: halaka.chatGroup, 
         };
 
         return success(res, result, 'تم جلب تفاصيل الحلقة بنجاح');
