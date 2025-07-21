@@ -45,8 +45,6 @@ export const getMyHalakat = async (req, res) => {
             const teacher = halaka.teacher;
             const user = teacher?.userId;
 
-            const firstUpcomingSession = halaka.getUpcomingSessions ? (await halaka.getUpcomingSessions(1))[0] : null;
-
             return {
                 id: halaka._id,
                 title: halaka.title,
@@ -59,11 +57,7 @@ export const getMyHalakat = async (req, res) => {
                 status: halaka.status,
                 halqaType: halaka.halqaType,
                 zoomJoinUrl: halaka.zoomMeeting?.joinUrl,
-                firstUpcomingSession: firstUpcomingSession ? {
-                    scheduledDate: firstUpcomingSession.scheduledDate,
-                    scheduledStartTime: firstUpcomingSession.scheduledStartTime,
-                    scheduledEndTime: firstUpcomingSession.scheduledEndTime,
-                } : null,
+                schedule: halaka.schedule, // Add the full schedule object here
             };
         }));
 
