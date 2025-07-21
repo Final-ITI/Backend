@@ -189,11 +189,12 @@ halakaSchema.post("save", async function (doc) {
         status: "pending_action",
         snapshot: {
           halakaTitle: doc.title,
-          totalPrice: doc.totalPrice,
+          pricePerStudent: doc.totalPrice,
+          pricePerSession: doc.price,
           currency: doc.currency || "EGP",
         },
       });
-
+      console.log("✅ Enrollment created for private halaka:", enrollment._id);
       // Find the student's main user ID to send the notification to
       const studentProfile = await mongoose
         .model("Student")
