@@ -189,4 +189,3 @@ teacherSchema.virtual("studentsCount", {
 const Teacher =
   mongoose.models.Teacher || mongoose.model("Teacher", teacherSchema);
 export default Teacher;
-
