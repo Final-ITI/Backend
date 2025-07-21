@@ -10,6 +10,7 @@ import Teacher from "../../../DB/models/teacher.js";
 import Session from "../../../DB/models/session.js";
 import { paginated } from "../../utils/apiResponse.js";
 import User from "../../../DB/models/user.js";
+import Student from "../../../DB/models/student.js";
 
 //teacher
 
@@ -23,7 +24,7 @@ export const createHalaka = async (req, res) => {
       title,
       description,
       halqaType,
-      student,
+      userId,
       schedule,
       curriculum,
       maxStudents,
@@ -48,8 +49,18 @@ export const createHalaka = async (req, res) => {
       return validationError(res, ["المعلم لا يملك سعر جلسة محدد"]);
     }
 
-    if (halqaType === "private" && !student) {
-      return validationError(res, ["معرف الطالب مطلوب للحلقة الخاصة"]);
+    let studentDoc = null;
+    if (halqaType === "private") {
+      if (!userId) {
+        return validationError(res, [
+          "userId الخاص بالطالب مطلوب للحلقة الخاصة",
+        ]);
+      }
+      // Find the student by userId (userId is from req.body)
+      studentDoc = await Student.findOne({ userId });
+      if (!studentDoc) {
+        return validationError(res, ["لم يتم العثور على طالب بهذا userId"]);
+      }
     }
 
     if (halqaType === "halqa" && !maxStudents) {
@@ -67,7 +78,7 @@ export const createHalaka = async (req, res) => {
     };
 
     if (halqaType === "private") {
-      halakaData.student = student;
+      halakaData.student = studentDoc._id;
       halakaData.maxStudents = 1;
       halakaData.currentStudents = 1;
       halakaData.price = Number(teacher.sessionPrice);
