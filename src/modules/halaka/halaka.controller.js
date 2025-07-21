@@ -301,13 +301,13 @@ export const getHalakaStudents = async (req, res) => {
         .map((stu) => {
           return stu.userId
             ? {
-                id: stu._id,
-                firstName: stu.userId.firstName,
-                lastName: stu.userId.lastName,
-                email: stu.userId.email,
-                profilePicture:
-                  stu.userId.profilePicture || "/default-profile.jpg",
-              }
+              id: stu._id,
+              firstName: stu.userId.firstName,
+              lastName: stu.userId.lastName,
+              email: stu.userId.email,
+              profilePicture:
+                stu.userId.profilePicture || "/default-profile.jpg",
+            }
             : null;
         })
         .filter(Boolean);
@@ -549,18 +549,18 @@ export const getHalakaAttendance = async (req, res) => {
         const stu = r.student;
         return stu && stu.userId
           ? {
-              student: {
-                id: stu._id,
-                firstName: stu.userId.firstName,
-                lastName: stu.userId.lastName,
-                email: stu.userId.email,
-                profilePicture:
-                  stu.userId.profilePicture || "/default-profile.jpg",
-              },
-              status: SESSION_STATUS_AR[r.status] || r.status,
-              timeIn: r.timeIn,
-              timeOut: r.timeOut,
-            }
+            student: {
+              id: stu._id,
+              firstName: stu.userId.firstName,
+              lastName: stu.userId.lastName,
+              email: stu.userId.email,
+              profilePicture:
+                stu.userId.profilePicture || "/default-profile.jpg",
+            },
+            status: SESSION_STATUS_AR[r.status] || r.status,
+            timeIn: r.timeIn,
+            timeOut: r.timeOut,
+          }
           : null;
       }),
     }));
@@ -763,10 +763,10 @@ export const getCancelledSessions = async (req, res) => {
         totalCancelled: cancelledSessions.length,
         originalEndDate: halaka.totalSessions
           ? findOriginalEndDate(
-              halaka.schedule.startDate,
-              halaka.schedule.days,
-              halaka.totalSessions
-            )
+            halaka.schedule.startDate,
+            halaka.schedule.days,
+            halaka.totalSessions
+          )
           : null,
         extendedEndDate: halaka.schedule.endDate,
       },
