@@ -966,10 +966,7 @@ export const updateHalakaProgress = async (req, res) => {
       return error(res, "لم يتم العثور على المعلم", 403);
     }
 
-    console.log("Debugging updateHalakaProgress:");
-    console.log("req.params.halakaId:", halakaId);
-    console.log("req.user._id (from auth token):", req.user._id);
-    console.log("teacher._id (found from user ID):", teacher._id);
+   
 
 
     const halaka = await Halaka.findOne({
