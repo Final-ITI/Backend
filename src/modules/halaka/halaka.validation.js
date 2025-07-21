@@ -85,12 +85,12 @@ export const createHalakaValidation = [
     .withMessage(messages.mustBePositiveInt("الحد الأقصى للطلاب")),
 
   // Conditional validation for private halaka
-  body("student")
+  body("userId")
     .if(body("halqaType").equals("private"))
     .notEmpty()
-    .withMessage(messages.required("معرّف الطالب"))
+    .withMessage(messages.required("معرّف المستخدم"))
     .isMongoId()
-    .withMessage(messages.mustBeObjectId("معرّف الطالب")),
+    .withMessage(messages.mustBeObjectId("معرّف المستخدم")),
 ];
 
 export const updateHalakaValidation = [
