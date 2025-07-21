@@ -31,6 +31,7 @@ export const createHalaka = async (req, res) => {
       price,
     } = req.body;
 
+
     // Basic validation first
     if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
