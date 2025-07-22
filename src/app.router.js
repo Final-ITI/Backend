@@ -16,6 +16,7 @@ import enrollmentRouter from "./modules/enrollment/enrollment.router.js";
 import notificationRouter from "./modules/notification/notification.router.js";
 import reviewRouter from "./modules/review/review.router.js";
 import studentRouter from "./modules/student/student.router.js";
+import paymentRouter from "./modules/payment/payment.router.js";
 
 export const appRouter = (app, express) => {
   // global middlewares
@@ -46,6 +47,7 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/notifications", notificationRouter);
   app.use("/api/v1/reviews", reviewRouter);
   app.use("/api/v1/student", studentRouter);
+  app.use("/api/v1/payment", paymentRouter);
 
   // 404 handler
   app.use(notFoundHandler);
