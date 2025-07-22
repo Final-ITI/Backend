@@ -119,7 +119,6 @@ export const initiatePayment = asyncHandler(async (req, res) => {
         enrollment._id.toString(),
         // user.email
       );
-      console.log("Paymob Order registered:", order);
       orderId = order.id;
 
       // Save the new order ID to the enrollment for future attempts
@@ -154,3 +153,111 @@ export const initiatePayment = asyncHandler(async (req, res) => {
     );
   }
 });
+
+
+
+
+/**
+ * Paymob Payment Webhook Handler
+ * Receives payment notification from Paymob, verifies, and updates enrollment and teacher wallet
+ */
+export const paymobPaymentWebhook = async (req, res) => {
+  try {
+    // 1. Verify Paymob signature (optional, recommended for security)
+    // You may want to check req.headers or req.body for a signature field
+    // For now, we assume it's valid (implement signature check as needed)
+    console.log("#####Received Paymob webhook######");
+    const { obj } = req.body; // Paymob sends payment info in 'obj'
+    if (!obj) return res.status(400).json({ message: "Invalid payload" });
+
+    // 2. Find Enrollment by merchant_order_id (Paymob order registration step used enrollmentId)
+    const enrollmentId = obj.order?.merchant_order_id;
+    if (!enrollmentId)
+      return res
+        .status(400)
+        .json({ message: "Missing enrollment/order reference" });
+
+    const enrollment = await Enrollment.findById(enrollmentId).populate({
+      path: "halaka",
+      populate: { path: "teacher" },
+    });
+    if (!enrollment)
+      return res.status(404).json({ message: "Enrollment not found" });
+
+    // 3. Check payment success
+    if (obj.success !== true && obj.success !== "true") {
+      return res
+        .status(200)
+        .json({ message: "Payment not successful, ignored." });
+    }
+
+    // 4. Update Enrollment status and sessionsRemaining if not already active
+    if (enrollment.status !== "active") {
+      enrollment.status = "active";
+      // Set sessionsRemaining (example: 4 for private, 1 for group, adjust as needed)
+      if (enrollment.snapshot.pricePerSession) {
+        enrollment.sessionsRemaining = obj.sessionsPurchased || 4; // fallback default
+      } else {
+        enrollment.sessionsRemaining = 1;
+      }
+      await enrollment.save();
+    }
+
+    // 5. Update TeacherWallet
+    const teacherId = enrollment.halaka.teacher?._id;
+    if (teacherId) {
+      let wallet = await TeacherWallet.findOne({ teacher: teacherId });
+      if (!wallet) {
+        wallet = await TeacherWallet.create({ teacher: teacherId });
+      }
+      // Calculate net amount (platform fee logic can be added)
+      const amount = obj.amount_cents ? obj.amount_cents / 100 : 0;
+      const platformFee = 0; // Add your fee logic here
+      const netAmount = amount - platformFee;
+      wallet.balance += netAmount;
+      await wallet.save();
+
+      // 6. Create Transaction record
+      await Transaction.create({
+        user: enrollment.student,
+        teacher: teacherId,
+        enrollment: enrollment._id,
+        type: enrollment.snapshot.pricePerSession
+          ? "package_purchase"
+          : "group_course_payment",
+        amount,
+        platformFee,
+        netAmount,
+        paymentGateway: "Paymob",
+        gatewayTransactionId: obj.id,
+        status: "completed",
+      });
+    }
+
+    // 7. Send notifications
+    await sendNotification({
+      recipient: enrollment.student, // student userId
+      type: "payment_success",
+      message: `تمت عملية الدفع بنجاح لحلقة ${enrollment.snapshot.halakaTitle}`,
+      link: `/enrollments/${enrollment._id}`,
+    });
+    if (enrollment.halaka.teacher?.userId) {
+      await sendNotification({
+        recipient: enrollment.halaka.teacher.userId,
+        type: "payment_success",
+        message: `تم استلام دفعة جديدة لحلقة ${enrollment.snapshot.halakaTitle}`,
+        link: `/halakat/${enrollment.halaka._id}`,
+      });
+    }
+
+    return res.status(200).json({ message: "Payment processed successfully" });
+  } catch (err) {
+    console.error("Paymob webhook error:", err);
+    return res
+      .status(500)
+      .json({
+        message: "Failed to process payment webhook",
+        error: err.message,
+      });
+  }
+};
