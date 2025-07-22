@@ -1,4 +1,7 @@
-import Halaka, { getAllSessionDates } from "../../../DB/models/halaka.js";
+import Halaka, {
+  getAllSessionDates,
+  calculateEndTime,
+} from "../../../DB/models/halaka.js";
 import {
   created,
   error,
@@ -228,6 +231,58 @@ export const getHalakatByTeacher = async (req, res) => {
     return success(res, halakat, "تم جلب الحلقات بنجاح");
   } catch (err) {
     return error(res, "فشل في جلب الحلقات", 500, err);
+  }
+};
+
+// get today's halakat for teacher dashboard
+
+export const getTodayHalakatForTeacher = async (req, res) => {
+  try {
+    const teacher = await Teacher.findOne({ userId: req.user._id });
+    if (!teacher) return error(res, "لم يتم العثور على المعلم", 403);
+
+    const now = new Date();
+    const todayName = now
+      .toLocaleString("en-US", { weekday: "long" })
+      .toLowerCase();
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+
+    const halakat = await Halaka.find({
+      teacher: teacher._id,
+      "schedule.days": todayName,
+      "schedule.startDate": { $lte: todayUtc },
+      "schedule.endDate": { $gte: todayUtc },
+    });
+
+    const mapped = halakat.map((h) => {
+      const endTime = calculateEndTime(
+        h.schedule.startTime,
+        h.schedule.duration
+      );
+
+      let numberOfStudents = 0;
+      if (h.halqaType === "halqa") {
+        numberOfStudents = Array.isArray(h.students)
+          ? h.students.length
+          : h.currentStudents || 0;
+      } else if (h.halqaType === "private") {
+        numberOfStudents = h.student ? 1 : 0;
+      }
+
+      return {
+        title: h.title,
+        startTime: h.schedule.startTime,
+        endTime,
+        numberOfStudents,
+        zoomMeeting: h.zoomMeeting || {},
+      };
+    });
+
+    return success(res, mapped, "تم جلب الحلقات المجدولة اليوم بنجاح");
+  } catch (err) {
+    console.error(err);
+    return error(res, "فشل في جلب الحلقات المجدولة اليوم", 500, err);
   }
 };
 
