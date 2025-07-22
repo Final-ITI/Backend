@@ -62,6 +62,10 @@ const enrollmentSchema = new Schema(
         default: "EGP",
       },
     },
+    // Paymob
+    paymobOrderId: {
+        type: Number,
+    }
   },
   {
     timestamps: true, // Adds createdAt and updatedAt fields

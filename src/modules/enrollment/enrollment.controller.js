@@ -128,6 +128,7 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
 
   if (!enrollment) return notFound(res, "Invitation not found");
 
+
   return success(
     res,
     EnrollmentService.formatInvitation(enrollment),
