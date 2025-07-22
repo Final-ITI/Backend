@@ -265,38 +265,111 @@ halakaSchema.methods.isSessionCancelled = function (d) {
   );
 };
 
+// halakaSchema.methods.getUpcomingSessions = function (
+//   limit = 5,
+//   from = new Date()
+// ) {
+//   const sessions = [];
+//   const sessionDays = this.schedule.days;
+//   if (!sessionDays || sessionDays.length === 0) return sessions;
+//   let current = new Date(from);
+
+//   current.setUTCHours(0, 0, 0, 0);
+
+//   const scheduleStart = new Date(this.schedule.startDate);
+//   const scheduleEnd = new Date(this.schedule.endDate);
+
+//   if (current < scheduleStart) {
+//     current = new Date(scheduleStart);
+//   }
+//   let guard = 0;
+//   while (current <= scheduleEnd && sessions.length < limit && guard < 1000) {
+//     const dayName = current
+//       .toLocaleString("en-US", { weekday: "long" })
+//       .toLowerCase();
+
+//     if (sessionDays.includes(dayName)) {
+//       const sessionDate = new Date(
+//         Date.UTC(
+//           current.getUTCFullYear(),
+//           current.getUTCMonth(),
+//           current.getUTCDate(),
+//           0,
+//           0,
+//           0,
+//           0
+//         )
+//       );
+
+//       const isCancelled = this.isSessionCancelled(sessionDate);
+//       sessions.push({
+//         scheduledDate: sessionDate,
+//         scheduledStartTime: this.schedule.startTime,
+//         scheduledEndTime: calculateEndTime(
+//           this.schedule.startTime,
+//           this.schedule.duration
+//         ),
+//         zoomMeeting: this.zoomMeeting,
+//         isCancelled,
+//       });
+//     }
+//     current.setUTCDate(current.getUTCDate() + 1);
+//     guard++;
+//   }
+
+//   return sessions;
+// };
+
 halakaSchema.methods.getUpcomingSessions = function (
   limit = 5,
   from = new Date()
 ) {
   const sessions = [];
-  let current = new Date(from);
-  const end = new Date(this.schedule.endDate);
+  const sessionDays = this.schedule.days;
+  if (!sessionDays || !sessionDays.length) return sessions;
 
-  while (current <= end && sessions.length < limit) {
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+
+  let current = new Date(from);
+  current.setUTCHours(0, 0, 0, 0);
+
+  const scheduleStart = new Date(this.schedule.startDate);
+  const scheduleEnd = new Date(this.schedule.endDate);
+
+  const minDate = todayUtc > scheduleStart ? todayUtc : scheduleStart;
+  if (current < minDate) current = new Date(minDate);
+
+  let guard = 0;
+  while (current <= scheduleEnd && sessions.length < limit && guard < 1000) {
     const dayName = current
       .toLocaleString("en-US", { weekday: "long" })
       .toLowerCase();
 
-    if (
-      this.schedule.days.includes(dayName) &&
-      current >= new Date(this.schedule.startDate)
-    ) {
-      const isCancelled = this.isSessionCancelled(current);
+    if (sessionDays.includes(dayName)) {
+      const sessionDate = new Date(
+        Date.UTC(
+          current.getUTCFullYear(),
+          current.getUTCMonth(),
+          current.getUTCDate()
+        )
+      );
 
+      const isCancelled = this.isSessionCancelled(sessionDate);
       sessions.push({
-        scheduledDate: new Date(current),
+        scheduledDate: sessionDate,
         scheduledStartTime: this.schedule.startTime,
         scheduledEndTime: calculateEndTime(
           this.schedule.startTime,
           this.schedule.duration
         ),
         zoomMeeting: this.zoomMeeting,
-        isCancelled: isCancelled, // new field
+        isCancelled,
       });
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
+    guard++;
   }
 
   return sessions;
@@ -336,7 +409,6 @@ export function getAllSessionDates(schedule, needed) {
   const dates = [];
   let cur = new Date(schedule.startDate);
   let guard = 0;
-
   while (dates.length < needed && guard < 1000) {
     const d = cur.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
     if (schedule.days.includes(d)) dates.push(new Date(cur));
