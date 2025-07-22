@@ -4,6 +4,7 @@ import Student from "../../../DB/models/student.js";
 import User from "../../../DB/models/user.js";
 import { success, notFound, error } from "../../utils/apiResponse.js";
 import { asyncHandler } from "../../utils/apiError.js";
+import TeacherWallet from "../../../DB/models/teacherWallet.js";
 
 const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
 const PAYMOB_INTEGRATION_ID = process.env.PAYMOB_INTEGRATION_ID;
