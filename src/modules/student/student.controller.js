@@ -56,7 +56,7 @@ export const getMyHalakat = async (req, res) => {
                 curriculum: halaka.curriculum,
                 status: halaka.status,
                 halqaType: halaka.halqaType,
-                zoomJoinUrl: halaka.zoomMeeting?.joinUrl,
+                zoomMeeting: halaka.zoomMeeting,
                 schedule: halaka.schedule, // Add the full schedule object here
             };
         }));
