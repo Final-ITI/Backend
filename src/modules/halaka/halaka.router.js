@@ -16,7 +16,7 @@ import {
   getTeacherDashboardStats,
   getHalakaProgress, // Import new function
   updateHalakaProgress, // Import new function
-
+  getTodayHalakatForTeacher,
 } from "./halaka.controller.js";
 import {
   createHalakaValidation,
@@ -52,6 +52,14 @@ router.put(
   updateHalaka
 );
 router.delete("/:id", authenticate, authorize("teacher"), deleteHalaka);
+
+router.get(
+  "/teacher/today-halakat",
+  authenticate,
+  authorize("teacher"),
+  getTodayHalakatForTeacher
+);
+
 router.get(
   "/teacher/:teacherId",
   authenticate,
@@ -115,7 +123,6 @@ router.get(
   getSessionAnalytics
 );
 
-
 // Get teacher dashboard stats
 router.get(
   "/dashboard",
@@ -138,6 +145,5 @@ router.put(
   authorize("teacher"),
   updateHalakaProgress
 );
-
 
 export default router;
