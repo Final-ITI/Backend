@@ -32,7 +32,6 @@ export const createHalaka = async (req, res) => {
       price,
     } = req.body;
 
-
     // Basic validation first
     if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
@@ -596,7 +595,6 @@ export const getHalakaAttendance = async (req, res) => {
  * Cancel Session                                     *
  * -------------------------------------------------- */
 const yyyymmdd = (d) => new Date(d).toISOString().slice(0, 10);
-
 export const cancelSession = async (req, res) => {
   try {
     const teacher = await Teacher.findOne({ userId: req.user._id });
@@ -618,8 +616,10 @@ export const cancelSession = async (req, res) => {
     const dates = getAllSessionDates(halaka.schedule, need);
     const match = dates.find((d) => yyyymmdd(d) === reqDate);
 
-    if (!match)
+    if (!match) {
+      console.log(reqDate, dates);
       return error(res, "تاريخ الجلسة ليس من الجلسات المجدولة القادمة", 400);
+    }
 
     if (
       halaka.cancelledSessions?.some((c) => yyyymmdd(c.sessionDate) === reqDate)
@@ -911,7 +911,6 @@ export const getHalakaProgress = async (req, res) => {
     // console.log("req.user._id (from auth token):", req.user._id);
     // console.log("teacher._id (found from user ID):", teacher._id);
 
-
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
@@ -976,7 +975,9 @@ export const getHalakaProgress = async (req, res) => {
 
     const sessionsData = allSessionDates.map((date, index) => {
       const attendanceEntry = halaka.attendance.find(
-        (att) => att.sessionDate.toISOString().slice(0, 10) === date.toISOString().slice(0, 10)
+        (att) =>
+          att.sessionDate.toISOString().slice(0, 10) ===
+          date.toISOString().slice(0, 10)
       );
       return {
         sessionNumber: index + 1,
@@ -988,7 +989,8 @@ export const getHalakaProgress = async (req, res) => {
     const studentProgress = allStudents.map((student) => {
       const studentSessionData = sessionsData.map((session) => {
         const attendanceEntryForSession = halaka.attendance.find(
-          (att) => att.sessionDate.toISOString().slice(0, 10) === session.sessionDate
+          (att) =>
+            att.sessionDate.toISOString().slice(0, 10) === session.sessionDate
         );
 
         const attendanceRecord = attendanceEntryForSession?.records.find(
@@ -1011,7 +1013,11 @@ export const getHalakaProgress = async (req, res) => {
       };
     });
 
-    return success(res, { halakaId: halaka._id, studentProgress, sessionsData }, "تم جلب تقدم الطلاب بنجاح");
+    return success(
+      res,
+      { halakaId: halaka._id, studentProgress, sessionsData },
+      "تم جلب تقدم الطلاب بنجاح"
+    );
   } catch (err) {
     console.error("خطأ في جلب تقدم الطلاب:", err);
     return error(res, "فشل في جلب تقدم الطلاب", 500, err);
@@ -1032,9 +1038,6 @@ export const updateHalakaProgress = async (req, res) => {
       return error(res, "لم يتم العثور على المعلم", 403);
     }
 
-   
-
-
     const halaka = await Halaka.findOne({
       _id: halakaId,
       teacher: teacher._id,
@@ -1046,7 +1049,9 @@ export const updateHalakaProgress = async (req, res) => {
 
     const sessionDateObj = new Date(sessionDate);
     let attendanceEntry = halaka.attendance.find(
-      (att) => att.sessionDate.toISOString().slice(0, 10) === sessionDateObj.toISOString().slice(0, 10)
+      (att) =>
+        att.sessionDate.toISOString().slice(0, 10) ===
+        sessionDateObj.toISOString().slice(0, 10)
     );
 
     if (!attendanceEntry) {
@@ -1075,7 +1080,7 @@ export const updateHalakaProgress = async (req, res) => {
       });
     }
 
-    halaka.markModified('attendance'); // Mark attendance array as modified
+    halaka.markModified("attendance"); // Mark attendance array as modified
     await halaka.save();
 
     return success(
