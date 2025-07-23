@@ -157,7 +157,6 @@ export const updateHalaka = async (req, res) => {
       "curriculum",
       "maxStudents",
       "price",
-      "status",
     ];
 
     for (const key of allowedFields) {
