@@ -12,9 +12,9 @@ const transactionSchema = new Schema({
         enum: ["package_purchase", "group_course_payment", "payout", "refund"]
     },
     
-    amount: { type: Number, required: true }, // المبلغ الإجمالي الذي دفعه الطالب
+    amount: { type: Number, required: true }, 
     platformFee: { type: Number, default: 0 }, // عمولة المنصة
-    netAmount: { type: Number, required: true }, // المبلغ الصافي الذي يذهب للمعلم
+    netAmount: { type: Number, required: true }, 
 
     paymentGateway: { type: String, default: "Paymob" },
     gatewayTransactionId: { type: String, unique: true, required: true },
