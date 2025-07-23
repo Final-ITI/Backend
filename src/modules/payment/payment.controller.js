@@ -2,9 +2,12 @@ import axios from "axios";
 import Enrollment from "../../../DB/models/enrollment.js";
 import Student from "../../../DB/models/student.js";
 import User from "../../../DB/models/user.js";
-import { success, notFound, error } from "../../utils/apiResponse.js";
+import { success, notFound, error, forbidden } from "../../utils/apiResponse.js";
 import { asyncHandler } from "../../utils/apiError.js";
 import TeacherWallet from "../../../DB/models/teacherWallet.js";
+import { sendNotification } from "../../services/notification.service.js";
+import Transaction from "../../../DB/models/transaction.js";
+import crypto from "crypto";
 
 const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
 const PAYMOB_INTEGRATION_ID = process.env.PAYMOB_INTEGRATION_ID;
@@ -162,103 +165,109 @@ export const initiatePayment = asyncHandler(async (req, res) => {
  * Paymob Payment Webhook Handler
  * Receives payment notification from Paymob, verifies, and updates enrollment and teacher wallet
  */
-export const paymobPaymentWebhook = async (req, res) => {
-  try {
-    // 1. Verify Paymob signature (optional, recommended for security)
-    // You may want to check req.headers or req.body for a signature field
-    // For now, we assume it's valid (implement signature check as needed)
-    console.log("#####Received Paymob webhook######");
-    const { obj } = req.body; // Paymob sends payment info in 'obj'
-    if (!obj) return res.status(400).json({ message: "Invalid payload" });
+export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
+    // --- Step 0: Receive Data from Paymob ---
+    // Paymob sends all data in the req.body object
+    const { obj: transactionDetails } = req.body;
 
-    // 2. Find Enrollment by merchant_order_id (Paymob order registration step used enrollmentId)
-    const enrollmentId = obj.order?.merchant_order_id;
-    if (!enrollmentId)
-      return res
-        .status(400)
-        .json({ message: "Missing enrollment/order reference" });
-
-    const enrollment = await Enrollment.findById(enrollmentId).populate({
-      path: "halaka",
-      populate: { path: "teacher" },
-    });
-    if (!enrollment)
-      return res.status(404).json({ message: "Enrollment not found" });
-
-    // 3. Check payment success
-    if (obj.success !== true && obj.success !== "true") {
-      return res
-        .status(200)
-        .json({ message: "Payment not successful, ignored." });
+    if (!transactionDetails) {
+        // If no data is received, send an error
+        return error(res, "Invalid payload", 400);
     }
 
-    // 4. Update Enrollment status and sessionsRemaining if not already active
-    if (enrollment.status !== "active") {
-      enrollment.status = "active";
-      // Set sessionsRemaining (example: 4 for private, 1 for group, adjust as needed)
-      if (enrollment.snapshot.pricePerSession) {
-        enrollment.sessionsRemaining = obj.sessionsPurchased || 4; // fallback default
-      } else {
-        enrollment.sessionsRemaining = 1;
-      }
-      await enrollment.save();
+    // --- Step 1: HMAC Signature Validation (Security) ---
+    // This is the most critical security step to ensure the request is from Paymob and hasn't been tampered with.
+     const hmac = req.query.hmac;
+    const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
+    
+    // Paymob specifies a particular order for the fields used to create the signature.
+    const hmacFields = [
+        transactionDetails.amount_cents, transactionDetails.created_at, transactionDetails.currency,
+        transactionDetails.error_occured, transactionDetails.has_parent_transaction, transactionDetails.id,
+        transactionDetails.integration_id, transactionDetails.is_3d_secure, transactionDetails.is_auth,
+        transactionDetails.is_capture, transactionDetails.is_refunded, transactionDetails.is_standalone_payment,
+        transactionDetails.is_voided, transactionDetails.order.id, transactionDetails.owner,
+        transactionDetails.pending, transactionDetails.source_data.pan, transactionDetails.source_data.sub_type,
+        transactionDetails.source_data.type, transactionDetails.success,
+    ].join('');
+
+    // We create our own signature using the same secret key to compare it.
+    const calculatedHmac = crypto.createHmac('sha512', hmacSecret).update(hmacFields).digest('hex');
+
+    if (calculatedHmac !== hmac) {
+        // If the signatures don't match, reject the request immediately.
+        console.error("HMAC validation failed. Request might be tampered with.");
+        return forbidden(res, "Invalid HMAC");
     }
 
-    // 5. Update TeacherWallet
-    const teacherId = enrollment.halaka.teacher?._id;
-    if (teacherId) {
-      let wallet = await TeacherWallet.findOne({ teacher: teacherId });
-      if (!wallet) {
-        wallet = await TeacherWallet.create({ teacher: teacherId });
-      }
-      // Calculate net amount (platform fee logic can be added)
-      const amount = obj.amount_cents ? obj.amount_cents / 100 : 0;
-      const platformFee = 0; // Add your fee logic here
-      const netAmount = amount - platformFee;
-      wallet.balance += netAmount;
-      await wallet.save();
+    // --- Step 2: Process the Request after ensuring it's secure ---
+    
+    // We check that the payment was successful and is not pending.
+    if (transactionDetails.success === true && transactionDetails.pending === false) {
+        
+        // We extract the enrollment ID that we previously sent to Paymob.
+        const enrollmentId = transactionDetails.order.merchant_order_id;
+        
+        // We find the enrollment in our database.
+        const enrollment = await Enrollment.findById(enrollmentId).populate({
+            path: 'halaka',
+            select: 'teacher totalSessions title'
+        });
+        
+        // --- Step 3: Idempotency Check ---
+        // We ensure that we haven't processed this payment before.
+        if (enrollment && enrollment.status === 'pending_payment') {
+            
+            // a. Update enrollment status and session balance
+            enrollment.status = 'active';
+            if (enrollment.halaka && enrollment.halaka.totalSessions) {
+                enrollment.sessionsRemaining = enrollment.halaka.totalSessions;
+            }
+            await enrollment.save();
 
-      // 6. Create Transaction record
-      await Transaction.create({
-        user: enrollment.student,
-        teacher: teacherId,
-        enrollment: enrollment._id,
-        type: enrollment.snapshot.pricePerSession
-          ? "package_purchase"
-          : "group_course_payment",
-        amount,
-        platformFee,
-        netAmount,
-        paymentGateway: "Paymob",
-        gatewayTransactionId: obj.id,
-        status: "completed",
-      });
+            // b. Create a permanent transaction record
+            const amount = transactionDetails.amount_cents / 100;
+            const platformFee = amount * 0.05; // 5% platform fee
+            const netAmount = amount - platformFee;
+            
+            await Transaction.create({
+                user: enrollment.student, // This should be the Student Profile ID
+                teacher: enrollment.halaka.teacher,
+                enrollment: enrollment._id,
+                type: enrollment.snapshot.totalPrice ? "package_purchase" : "group_course_payment",
+                amount,
+                platformFee,
+                netAmount,
+                gatewayTransactionId: transactionDetails.id.toString(),
+                status: 'completed',
+            });
+
+            // c. Update the teacher's wallet
+            await TeacherWallet.findOneAndUpdate(
+                { teacher: enrollment.halaka.teacher },
+                { $inc: { balance: netAmount } },
+                { upsert: true, new: true } // upsert: true creates a new wallet if it doesn't exist
+            );
+
+            // d. Send success notifications
+            const studentProfile = await Student.findById(enrollment.student).select('user');
+            if (studentProfile) {
+                await sendNotification({
+                    recipient: studentProfile.userId, 
+                    type: "payment_success",
+                    message: `Your payment for the halaka "${enrollment.snapshot.halakaTitle}" was successful.`,
+                    link: `/my-courses/${enrollment.halaka._id}`,
+                });
+            }
+            // You can add a notification for the teacher here in the same way
+
+            console.log(`✅ Successfully processed payment for enrollment: ${enrollmentId}`);
+        } else {
+            console.log(`❕ Payment for enrollment ${enrollmentId} was already processed or not found.`);
+        }
     }
 
-    // 7. Send notifications
-    await sendNotification({
-      recipient: enrollment.student, // student userId
-      type: "payment_success",
-      message: `تمت عملية الدفع بنجاح لحلقة ${enrollment.snapshot.halakaTitle}`,
-      link: `/enrollments/${enrollment._id}`,
-    });
-    if (enrollment.halaka.teacher?.userId) {
-      await sendNotification({
-        recipient: enrollment.halaka.teacher.userId,
-        type: "payment_success",
-        message: `تم استلام دفعة جديدة لحلقة ${enrollment.snapshot.halakaTitle}`,
-        link: `/halakat/${enrollment.halaka._id}`,
-      });
-    }
-
-    return res.status(200).json({ message: "Payment processed successfully" });
-  } catch (err) {
-    console.error("Paymob webhook error:", err);
-    return res
-      .status(500)
-      .json({
-        message: "Failed to process payment webhook",
-        error: err.message,
-      });
-  }
-};
+    // --- Step 4: Send a confirmation response to Paymob ---
+    // We must always send a 200 OK response to let Paymob know we have successfully received the webhook.
+    success(res, { received: true }, "Payment processed successfully");
+});

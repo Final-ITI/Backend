@@ -35,42 +35,53 @@ export const createHalaka = async (req, res) => {
       price,
     } = req.body;
 
-    // Basic validation first
+    // Required fields validation
     if (!title || !halqaType || !schedule || !curriculum) {
       return validationError(res, [
         "الحقول المطلوبة مفقودة: العنوان، نوع الحلقة، الجدول، المنهج",
       ]);
     }
 
-    // Get teacher BEFORE validation that uses teacher data
+    // Date validation
+    if (
+      schedule.startDate &&
+      schedule.endDate &&
+      new Date(schedule.endDate) < new Date(schedule.startDate)
+    ) {
+      return validationError(res, [
+        "تاريخ النهاية يجب أن يكون بعد تاريخ البداية",
+      ]);
+    }
+
+    // Teacher validation
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
       return error(res, "لم يتم العثور على المعلم", 403);
     }
 
-    // Now you can safely validate using teacher data
-    if (halqaType === "private" && !teacher.sessionPrice) {
-      return validationError(res, ["المعلم لا يملك سعر جلسة محدد"]);
-    }
-
+    // Private Halaka: check teacher sessionPrice and resolve student
     let studentDoc = null;
     if (halqaType === "private") {
+      if (!teacher.sessionPrice) {
+        return validationError(res, ["المعلم لا يملك سعر جلسة محدد"]);
+      }
       if (!userId) {
         return validationError(res, [
           "userId الخاص بالطالب مطلوب للحلقة الخاصة",
         ]);
       }
-      // Find the student by userId (userId is from req.body)
       studentDoc = await Student.findOne({ userId });
       if (!studentDoc) {
         return validationError(res, ["لم يتم العثور على طالب بهذا userId"]);
       }
     }
 
+    // Group Halaka: validate maxStudents
     if (halqaType === "halqa" && !maxStudents) {
       return validationError(res, ["الحد الأقصى للطلاب مطلوب للحلقة الجماعية"]);
     }
 
+    // Halaka upsert data
     const halakaData = {
       title,
       description,
@@ -96,15 +107,10 @@ export const createHalaka = async (req, res) => {
     let halaka = new Halaka(halakaData);
     await halaka.save();
 
-    // For group halaka, create a ChatGroup and assign it
+    // Create ChatGroup for group halaka
     if (halqaType === "halqa") {
-      // Get the teacher's userId
       const teacherDoc = await Teacher.findById(teacher._id).populate("userId");
-      let teacherUserId = null;
-      if (teacherDoc && teacherDoc.userId) {
-        teacherUserId = teacherDoc.userId._id;
-      }
-
+      let teacherUserId = teacherDoc?.userId?._id ?? null;
       if (teacherUserId) {
         const ChatGroup = (await import("../../../DB/models/chatGroup.js"))
           .default;
@@ -139,20 +145,33 @@ export const updateHalaka = async (req, res) => {
     });
     if (!halaka) return notFound(res, "لم يتم العثور على الحلقة");
 
+    if (req.body.schedule) {
+      for (const key of Object.keys(req.body.schedule)) {
+        halaka.schedule[key] = req.body.schedule[key];
+      }
+    }
+
     const allowedFields = [
       "title",
       "description",
-      "schedule",
       "curriculum",
       "maxStudents",
       "price",
-      "status",
     ];
 
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) halaka[key] = req.body[key];
     }
 
+    if (
+      halaka.schedule.startDate &&
+      halaka.schedule.endDate &&
+      new Date(halaka.schedule.endDate) < new Date(halaka.schedule.startDate)
+    ) {
+      return validationError(res, [
+        "تاريخ النهاية يجب أن يكون بعد تاريخ البداية",
+      ]);
+    }
     if (halaka.halqaType === "private") {
       halaka.price = Number(teacher.sessionPrice);
     }
@@ -161,6 +180,7 @@ export const updateHalaka = async (req, res) => {
 
     return success(res, halaka, "تم تحديث الحلقة بنجاح");
   } catch (err) {
+    console.log(err);
     return error(res, "فشل في تحديث الحلقة", 500, err);
   }
 };

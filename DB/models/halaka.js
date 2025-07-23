@@ -119,6 +119,13 @@ const halakaSchema = new Schema(
 /* ------------------------------------------------------------------ */
 halakaSchema.pre("save", async function (next) {
   this._wasNew = this.isNew;
+  if (
+    this.schedule?.startDate &&
+    this.schedule?.endDate &&
+    new Date(this.schedule.endDate) < new Date(this.schedule.startDate)
+  ) {
+    next(new ApiError("End date cannot be before start date"));
+  }
   if (!this.isNew) return next();
 
   // totalSessions & totalPrice
@@ -264,61 +271,6 @@ halakaSchema.methods.isSessionCancelled = function (d) {
     (c) => c.sessionDate.toISOString().slice(0, 10) === s
   );
 };
-
-// halakaSchema.methods.getUpcomingSessions = function (
-//   limit = 5,
-//   from = new Date()
-// ) {
-//   const sessions = [];
-//   const sessionDays = this.schedule.days;
-//   if (!sessionDays || sessionDays.length === 0) return sessions;
-//   let current = new Date(from);
-
-//   current.setUTCHours(0, 0, 0, 0);
-
-//   const scheduleStart = new Date(this.schedule.startDate);
-//   const scheduleEnd = new Date(this.schedule.endDate);
-
-//   if (current < scheduleStart) {
-//     current = new Date(scheduleStart);
-//   }
-//   let guard = 0;
-//   while (current <= scheduleEnd && sessions.length < limit && guard < 1000) {
-//     const dayName = current
-//       .toLocaleString("en-US", { weekday: "long" })
-//       .toLowerCase();
-
-//     if (sessionDays.includes(dayName)) {
-//       const sessionDate = new Date(
-//         Date.UTC(
-//           current.getUTCFullYear(),
-//           current.getUTCMonth(),
-//           current.getUTCDate(),
-//           0,
-//           0,
-//           0,
-//           0
-//         )
-//       );
-
-//       const isCancelled = this.isSessionCancelled(sessionDate);
-//       sessions.push({
-//         scheduledDate: sessionDate,
-//         scheduledStartTime: this.schedule.startTime,
-//         scheduledEndTime: calculateEndTime(
-//           this.schedule.startTime,
-//           this.schedule.duration
-//         ),
-//         zoomMeeting: this.zoomMeeting,
-//         isCancelled,
-//       });
-//     }
-//     current.setUTCDate(current.getUTCDate() + 1);
-//     guard++;
-//   }
-
-//   return sessions;
-// };
 
 halakaSchema.methods.getUpcomingSessions = function (
   limit = 5,
