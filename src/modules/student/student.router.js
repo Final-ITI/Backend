@@ -8,6 +8,6 @@ const router = Router();
 router.get('/my-halakat', authenticate, authorize('student'), studentController.getMyHalakat);
 
 // جلب تفاصيل حلقة معينة للطالب
-router.get('/halaka-details/:halakaId', authenticate, authorize('student'), studentController.getHalakaDetails);
+router.get('/halaka-details/:halakaId', authenticate, authorize('student', 'teacher'), studentController.getHalakaDetails);
 
 export default router; 
