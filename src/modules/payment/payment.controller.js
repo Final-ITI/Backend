@@ -194,14 +194,6 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
     // We create our own signature using the same secret key to compare it.
     const calculatedHmac = crypto.createHmac('sha512', hmacSecret).update(hmacFields).digest('hex');
 
-     // --- ADDED FOR DEBUGGING: Log the values to help find the issue ---
-    console.log("--- HMAC Validation ---");
-    console.log("Received HMAC:", hmac);
-    console.log("Calculated HMAC:", calculatedHmac);
-    console.log("HMACs Match:", calculatedHmac === hmac);
-    console.log("String used for calculation:", hmacFields);
-    console.log("-----------------------");
-
     if (calculatedHmac !== hmac) {
         // If the signatures don't match, reject the request immediately.
         console.error("HMAC validation failed. Request might be tampered with.");
@@ -261,7 +253,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
             const studentProfile = await Student.findById(enrollment.student).select('user');
             if (studentProfile) {
                 await sendNotification({
-                    recipient: studentProfile.user, // We send to the main User ID
+                    recipient: studentProfile.userId, 
                     type: "payment_success",
                     message: `Your payment for the halaka "${enrollment.snapshot.halakaTitle}" was successful.`,
                     link: `/my-courses/${enrollment.halaka._id}`,
