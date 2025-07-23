@@ -150,7 +150,7 @@ export const getHalakaDetails = async (req, res) => {
             title: halaka.title,
             description: halaka.description || '',
             teacher: {
-                id: teacher?._id, // Add teacher ID here
+                id: user?._id, // Changed to return the User's _id here
                 name: user ? `أ. ${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : 'غير متوفر',
                 profileImage: user?.profileImage ?? '/default-profile.jpg',
                 rating: teacher?.performance?.rating ?? 0,
