@@ -56,7 +56,7 @@ export const getMyHalakat = async (req, res) => {
                 curriculum: halaka.curriculum,
                 status: halaka.status,
                 halqaType: halaka.halqaType,
-                zoomJoinUrl: halaka.zoomMeeting?.joinUrl,
+                zoomMeeting: halaka.zoomMeeting,
                 schedule: halaka.schedule, // Add the full schedule object here
             };
         }));
@@ -96,7 +96,8 @@ export const getHalakaDetails = async (req, res) => {
         })
             .populate({
                 path: 'teacher',
-                populate: { path: 'userId', select: 'firstName lastName profileImage bio' }
+                select: '_id bio',
+                populate: { path: 'userId', select: 'firstName lastName profileImage' }
             })
             .populate('chatGroup');
 
@@ -149,6 +150,7 @@ export const getHalakaDetails = async (req, res) => {
             title: halaka.title,
             description: halaka.description || '',
             teacher: {
+                id: teacher?._id, // Add teacher ID here
                 name: user ? `أ. ${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : 'غير متوفر',
                 profileImage: user?.profileImage ?? '/default-profile.jpg',
                 rating: teacher?.performance?.rating ?? 0,
