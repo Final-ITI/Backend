@@ -48,24 +48,94 @@ async function upsertAttendance({
       e.sessionDate &&
       e.sessionDate.toISOString().slice(0, 10) === sessionDate.slice(0, 10)
   );
+
   if (!entry) {
-    entry = { sessionDate: new Date(sessionDate), records: [] };
+    // Initialize with all expected students marked as absent
+    let expectedStudentIds = [];
+    if (halaka.halqaType === "private" && halaka.student) {
+      expectedStudentIds = [String(halaka.student)];
+    } else if (halaka.halqaType === "halqa") {
+      expectedStudentIds = (halaka.students || []).map((s) => String(s));
+    }
+
+    // Build records
+    const records = expectedStudentIds.map((id) => ({
+      student: id,
+      status:
+        id === String(studentId) && action === "join" ? "present" : "absent",
+      ...(id === String(studentId) && action === "join"
+        ? { timeIn: eventTime }
+        : {}),
+    }));
+
+    entry = { sessionDate: new Date(sessionDate), records };
     halaka.attendance.push(entry);
+  } else {
+    // If entry exists, update or create student record
+    let studentRec = entry.records.find(
+      (r) => r.student.toString() === studentId.toString()
+    );
+
+    if (!studentRec) {
+      studentRec = {
+        student: studentId,
+        status: action === "join" ? "present" : "absent",
+        ...(action === "join" ? { timeIn: eventTime } : {}),
+      };
+      entry.records.push(studentRec);
+    } else {
+      if (action === "join") {
+        studentRec.status = "present";
+        studentRec.timeIn = eventTime;
+      }
+      if (action === "leave") {
+        studentRec.timeOut = eventTime;
+      }
+    }
   }
-  let studentRec = entry.records.find(
-    (r) => r.student.toString() === studentId.toString()
+}
+
+async function markAbsenteesForSession(halaka, sessionDateIso) {
+  // 1. Find or create the attendance entry for this session date
+  let entry = halaka.attendance.find(
+    (e) =>
+      e.sessionDate &&
+      e.sessionDate.toISOString().slice(0, 10) === sessionDateIso
   );
-  if (!studentRec) {
-    studentRec = { student: studentId };
-    entry.records.push(studentRec);
+
+  // 2. Get the expected list of students
+  let expectedStudentIds = [];
+  if (halaka.halqaType === "private" && halaka.student) {
+    expectedStudentIds = [String(halaka.student)];
+  } else if (halaka.halqaType === "halqa") {
+    expectedStudentIds = (halaka.students || []).map((s) => String(s));
   }
-  if (action === "join") {
-    studentRec.status = "present";
-    studentRec.timeIn = eventTime;
+
+  if (!entry) {
+    // 🔧 Initialize full entry with all students as absent
+    const records = expectedStudentIds.map((studentId) => ({
+      student: studentId,
+      status: "absent",
+    }));
+    entry = { sessionDate: new Date(sessionDateIso), records };
+    halaka.attendance.push(entry);
+  } else {
+    // 3. Fill in only the missing students
+    expectedStudentIds.forEach((studentId) => {
+      const rec = entry.records.find((r) => String(r.student) === studentId);
+
+      if (!rec) {
+        entry.records.push({
+          student: studentId,
+          status: "absent",
+        });
+      } else if (!rec.status || rec.status === "pending") {
+        rec.status = "absent";
+      }
+    });
   }
-  if (action === "leave") {
-    studentRec.timeOut = eventTime;
-  }
+
+  await halaka.save();
 }
 
 export const zoomAttendanceWebhook = async (req, res) => {
@@ -81,11 +151,41 @@ export const zoomAttendanceWebhook = async (req, res) => {
       return res.status(200).json({ plainToken, encryptedToken });
     }
 
-    // --- Process join/leave events ---
     const { event, payload } = req.body;
     const participant = payload?.object?.participant;
     const meetingId = payload?.object?.id;
 
+    // -- Meeting ended: Mark absentees --
+    if (event === "meeting.ended") {
+      const halaka = await Halaka.findOne({
+        "zoomMeeting.meetingId": meetingId,
+      });
+      if (!halaka) return notFound(res, "Halaka not found for meeting", 404);
+      const endTime = payload?.object?.end_time || new Date().toISOString();
+      const scheduledSessionDate = getScheduledSessionDate(
+        halaka.schedule,
+        endTime
+      );
+      if (!scheduledSessionDate) {
+        return error(
+          res,
+          "Could not find the scheduled session for meeting end.",
+          400
+        );
+      }
+      const sessionDateIso = scheduledSessionDate.toISOString().slice(0, 10);
+
+      await markAbsenteesForSession(halaka, sessionDateIso);
+
+      return success(
+        res,
+        null,
+        "تم تحديث الحضور للغائبين بعد نهاية الجلسة",
+        200
+      );
+    }
+
+    // --- Process join/leave events (unchanged) ---
     let eventTime;
     if (event === "meeting.participant_joined") {
       eventTime = participant?.join_time;
@@ -107,7 +207,6 @@ export const zoomAttendanceWebhook = async (req, res) => {
 
     // --- Restrict to only enrolled students ---
     if (halaka.halqaType === "private") {
-      // Private: only the assigned student can mark attendance
       if (
         !halaka.student ||
         student._id.toString() !== halaka.student.toString()
@@ -119,7 +218,6 @@ export const zoomAttendanceWebhook = async (req, res) => {
         );
       }
     } else if (halaka.halqaType === "halqa") {
-      // Group: only students officially enrolled in halaka.students array
       if (
         !Array.isArray(halaka.students) ||
         !halaka.students
