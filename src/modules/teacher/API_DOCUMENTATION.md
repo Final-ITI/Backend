@@ -130,3 +130,96 @@ fetch("/api/v1/teacher?gender=female&halqaType=halqa");
   "statusCode": 400
 }
 ```
+
+---
+
+## Teacher Personal Profile Endpoints
+
+### 2. Get Teacher Personal Profile
+
+**GET** `/profile`
+
+Returns the authenticated teacher's personal profile, including basic info, professional info, and uploaded documents.
+
+#### Example Response
+```json
+{
+  "status": "success",
+  "message": "Profile fetched successfully",
+  "data": {
+    "_id": "teacher_id",
+    "userId": "user_id",
+    "specialization": ["tajweed", "quran_memorization"],
+    "bio": "Experienced Quran teacher...",
+    "experience": 8,
+    "documents": [
+      {
+        "_id": "doc_id",
+        "docType": "certificates",
+        "fileUrl": "https://cloudinary.com/...",
+        "status": "pending"
+      }
+    ],
+    "profile": {
+      "firstName": "Sarah",
+      "lastName": "Ahmad",
+      "email": "sarah.ahmad@example.com",
+      "phone": "+654398750966",
+      "address": "Jeddah, Saudi Arabia"
+    }
+  }
+}
+```
+
+### 3. Update Teacher Personal Profile
+
+**PUT** `/profile`
+
+Update teacher's personal and professional info. Accepts fields: `bio`, `experience`, `specialization`, `address`, `phone`, `email`, `fullName`.
+
+#### Example Request
+```json
+{
+  "bio": "Specialized in Islamic studies...",
+  "experience": 8,
+  "specialization": ["quran_memorization", "arabic_language"],
+  "address": "Jeddah, Saudi Arabia",
+  "phone": "+654398750966",
+  "email": "sarah.ahmad@example.com",
+  "fullName": "Sarah Ahmad"
+}
+```
+
+### 4. Upload Teacher Document
+
+**POST** `/profile/documents`
+
+Upload a document for the teacher. Accepts a file (form-data, key: `file`) and `docType` (e.g., `certificates`, `national_id_front`).
+
+#### Example Response
+```json
+{
+  "status": "success",
+  "message": "Document uploaded successfully",
+  "data": {
+    "_id": "doc_id",
+    "docType": "certificates",
+    "fileUrl": "https://cloudinary.com/...",
+    "status": "pending"
+  }
+}
+```
+
+### 5. List Teacher Documents
+
+**GET** `/profile/documents`
+
+Returns all documents uploaded by the teacher.
+
+### 6. Delete Teacher Document
+
+**DELETE** `/profile/documents/:id`
+
+Deletes a document by its ID.
+
+---

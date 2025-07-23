@@ -60,6 +60,17 @@ const teacherSchema = new Schema(
       type: String,
       maxlength: [500, "Bio cannot exceed 500 characters"],
     },
+    birthdate: {
+      type: Date,
+    },
+    highestDegree: {
+      type: String,
+    },
+    subjects: [
+      {
+        type: String,
+      },
+    ],
     // national ID
     id_number: {
       type: String,
