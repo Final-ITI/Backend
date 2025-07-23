@@ -2,8 +2,7 @@ import { Router } from "express";
 import { getFreelanceTeachers } from "./teacher.controller.js";
 import {
   getTeacherProfile,
-  updateTeacherProfile,
-  uploadTeacherDocument,
+  updateTeacherProfileAndDocument,
   listTeacherDocuments,
   deleteTeacherDocument,
 } from "./teacher.profile.controller.js";
@@ -17,13 +16,22 @@ const router = Router();
 router.get("/", getFreelanceTeachers);
 
 // Profile endpoints
-router.get("/profile", authenticate, authorize('teacher') , getTeacherProfile);
-router.put("/profile",  authenticate, authorize('teacher') , validate(updateProfileValidation), updateTeacherProfile);
+router.get("/profile", authenticate, authorize('teacher'), getTeacherProfile);
 
-// Document endpoints
+// Single endpoint for profile update and document upload (one form/process)
 const upload = multer();
-router.post("/profile/documents",  authenticate, authorize('teacher') , upload.single("file"), validate(uploadDocumentValidation), uploadTeacherDocument);
-router.get("/profile/documents", authenticate, authorize('teacher') , listTeacherDocuments);
-router.delete("/profile/documents/:id", authenticate , authorize('teacher') , deleteTeacherDocument);
+router.put(
+  "/profile",
+  authenticate,
+  authorize('teacher'),
+  upload.single("file"),
+  validate(updateProfileValidation),
+  validate(uploadDocumentValidation),
+  updateTeacherProfileAndDocument
+);
+
+// Document endpoints (list & delete only, upload handled in profile PUT)
+router.get("/profile/documents", authenticate, authorize('teacher'), listTeacherDocuments);
+router.delete("/profile/documents/:id", authenticate, authorize('teacher'), deleteTeacherDocument);
 
 export default router;
