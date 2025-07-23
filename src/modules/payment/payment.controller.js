@@ -2,7 +2,7 @@ import axios from "axios";
 import Enrollment from "../../../DB/models/enrollment.js";
 import Student from "../../../DB/models/student.js";
 import User from "../../../DB/models/user.js";
-import { success, notFound, error } from "../../utils/apiResponse.js";
+import { success, notFound, error, forbidden } from "../../utils/apiResponse.js";
 import { asyncHandler } from "../../utils/apiError.js";
 import TeacherWallet from "../../../DB/models/teacherWallet.js";
 import { sendNotification } from "../../services/notification.service.js";
@@ -168,7 +168,7 @@ export const initiatePayment = asyncHandler(async (req, res) => {
 export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
     // --- Step 0: Receive Data from Paymob ---
     // Paymob sends all data in the req.body object
-    const { obj: transactionDetails, hmac } = req.body;
+    const { obj: transactionDetails } = req.body;
 
     if (!transactionDetails) {
         // If no data is received, send an error
@@ -177,6 +177,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
 
     // --- Step 1: HMAC Signature Validation (Security) ---
     // This is the most critical security step to ensure the request is from Paymob and hasn't been tampered with.
+     const hmac = req.query.hmac;
     const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
     
     // Paymob specifies a particular order for the fields used to create the signature.
@@ -193,10 +194,18 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
     // We create our own signature using the same secret key to compare it.
     const calculatedHmac = crypto.createHmac('sha512', hmacSecret).update(hmacFields).digest('hex');
 
+     // --- ADDED FOR DEBUGGING: Log the values to help find the issue ---
+    console.log("--- HMAC Validation ---");
+    console.log("Received HMAC:", hmac);
+    console.log("Calculated HMAC:", calculatedHmac);
+    console.log("HMACs Match:", calculatedHmac === hmac);
+    console.log("String used for calculation:", hmacFields);
+    console.log("-----------------------");
+
     if (calculatedHmac !== hmac) {
         // If the signatures don't match, reject the request immediately.
         console.error("HMAC validation failed. Request might be tampered with.");
-        return res.status(403).json({ message: "Invalid HMAC" });
+        return forbidden(res, "Invalid HMAC");
     }
 
     // --- Step 2: Process the Request after ensuring it's secure ---
