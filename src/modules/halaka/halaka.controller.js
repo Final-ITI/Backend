@@ -195,7 +195,22 @@ export const getHalakaById = async (req, res) => {
     const halaka = await Halaka.findOne({
       _id: req.params.id,
       teacher: teacher._id,
-    });
+    })
+      .populate({
+        path: "students",
+        populate: {
+          path: "userId",
+          select: "firstName lastName email _id profilePicture",
+        },
+      })
+      .populate({
+        path: "teacher",
+        populate: {
+          path: "userId",
+          select: "firstName lastName email _id profilePicture",
+        },
+      });
+
     if (!halaka)
       return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
@@ -633,10 +648,15 @@ export const getHalakaAttendance = async (req, res) => {
     if (!halaka) return notFound(res, "لم يتم العثور على الحلقة");
 
     let attendance = halaka.attendance;
-    if (req.query.date)
+    if (req.query.date) {
       attendance = attendance.filter(
         (a) => a.sessionDate.toISOString().slice(0, 10) === req.query.date
       );
+      // If no attendance for this date, return immediately
+      if (attendance.length === 0) {
+        return success(res, [], "لا توجد بيانات حضور لهذا التاريخ");
+      }
+    }
 
     // Format each record for name and student ID (keep status in English)
     const formatted = attendance.map((a) => ({
