@@ -1,13 +1,22 @@
 import { Router } from 'express';
-import { authenticate , authorize } from '../../middlewares/auth.middleware.js';
-import * as studentController from './student.controller.js';
+import { authenticate, authorize } from '../../middlewares/auth.middleware.js';
+import { validate } from '../../middlewares/validation.middleware.js';
+import { updateStudentProfileValidation } from './student.profile.validation.js';
+import { getStudentProfile, updateStudentProfile } from './student.profile.controller.js';
+import { getHalakaDetails, getMyHalakat } from './student.controller.js';
 
 const router = Router();
 
 // جلب جميع الحلقات التي سجل فيها الطالب (بيانات مختصرة للمشاهدة السريعة)
-router.get('/my-halakat', authenticate, authorize('student'), studentController.getMyHalakat);
+router.get('/my-halakat', authenticate, authorize('student'), getMyHalakat);
 
 // جلب تفاصيل حلقة معينة للطالب
-router.get('/halaka-details/:halakaId', authenticate, authorize('student', 'teacher'), studentController.getHalakaDetails);
+router.get('/halaka-details/:halakaId', authenticate, authorize('student', 'teacher'), getHalakaDetails);
 
-export default router; 
+// جلب بروفايل الطالب
+router.get('/profile', authenticate, authorize('student'), getStudentProfile);
+
+// تحديث بروفايل الطالب
+router.put('/profile', authenticate, authorize('student'), validate(updateStudentProfileValidation), updateStudentProfile);
+
+export default router;
