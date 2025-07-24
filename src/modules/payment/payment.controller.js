@@ -272,7 +272,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
 
       // d. Send success notifications
       const studentProfile = await Student.findById(enrollment.student).select(
-        "user"
+        "userId"
       );
       if (studentProfile) {
         await sendNotification({
