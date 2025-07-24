@@ -15,7 +15,8 @@ import Transaction from "../../../DB/models/transaction.js";
 import crypto from "crypto";
 
 const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
-const PAYMOB_INTEGRATION_ID = process.env.PAYMOB_INTEGRATION_ID;
+const PAYMOB_CARD_INTEGRATION_ID = process.env.PAYMOB_CARD_INTEGRATION_ID;
+const PAYMOB_WALLET_INTEGRATION_ID = process.env.PAYMOB_WALLET_INTEGRATION_ID;
 const PAYMOB_IFRAME_ID = process.env.PAYMOB_IFRAME_ID;
 const PAYMOB_BASE_URL = "https://accept.paymob.com/api";
 
@@ -51,7 +52,7 @@ async function registerPaymobOrder(
 }
 
 // Step 3: Payment Key Request
-async function getPaymobPaymentKey(token, amountCents, orderId, user) {
+async function getPaymobPaymentKey(token, amountCents, orderId, user, integrationId) {
   const { data } = await axios.post(
     `${PAYMOB_BASE_URL}/acceptance/payment_keys`,
     {
@@ -73,15 +74,28 @@ async function getPaymobPaymentKey(token, amountCents, orderId, user) {
         state: "N/A",
       },
       currency: "EGP",
-      integration_id: PAYMOB_INTEGRATION_ID,
+      integration_id: integrationId, 
     }
   );
   return data.token;
 }
+// --- Helper function to pay with wallet ---
+async function triggerWalletPayment(paymentKey, phoneNumber) {
+  const { data } = await axios.post(`${PAYMOB_BASE_URL}/acceptance/payments/pay`, {
+    source: {
+      identifier: phoneNumber,
+      subtype: "WALLET"
+    },
+    payment_token: paymentKey
+  });
+  // This request triggers the payment prompt on the user's phone.
+  // It doesn't typically return a redirect_url for wallets.
+  return data;
+}
 
 export const initiatePayment = asyncHandler(async (req, res) => {
   // --- 0. Extract and validate input ---
-  const { enrollmentId } = req.body;
+  const { enrollmentId, paymentMethod, walletPhoneNumber } = req.body;
 
   // --- 1. Validate enrollment and student ---
   const user = await User.findById(req.user._id);
@@ -90,12 +104,12 @@ export const initiatePayment = asyncHandler(async (req, res) => {
   const student = await Student.findOne({ userId: user._id }).select(
     "_id userId"
   );
-  if (!student) return notFound(res, "Student profile not found");
+  if (!student) return notFound(res, "الطالب غير موجود");
 
   const enrollment = await Enrollment.findById(enrollmentId);
-  if (!enrollment) return notFound(res, "Enrollment not found");
+  if (!enrollment) return notFound(res, "التسجيل غير موجود");
   if (enrollment.status !== "pending_payment")
-    return error(res, "Enrollment is not pending payment", 400);
+    return error(res, "التسجيل ليس في انتظار الدفع", 400);
 
   // --- 3. Prepare payment details ---
   // Use totalPrice, pricePerStudent, or pricePerSession (in that order)
@@ -106,6 +120,14 @@ export const initiatePayment = asyncHandler(async (req, res) => {
   );
 
   try {
+    // Determine the integration ID based on the payment method
+    let integrationId;
+    if (paymentMethod === 'wallet') {
+        integrationId = PAYMOB_WALLET_INTEGRATION_ID;
+    } else { // Default to card payment
+        integrationId = PAYMOB_CARD_INTEGRATION_ID;
+    }
+
     // --- PAYMOB 3-STEP INTEGRATION LOGIC ---
 
     // Step 1: Authentication Request to get an auth token from Paymob
@@ -141,23 +163,34 @@ export const initiatePayment = asyncHandler(async (req, res) => {
       paymobToken,
       amountCents,
       orderId,
-      user
+      user,
+      integrationId
     );
 
     // Build payment URL (iframe) https://accept.paymob.com/api
-    const paymentUrl = `${PAYMOB_BASE_URL}/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+    let responseData = { paymentKey, orderId, paymentMethod };
+    let paymentUrl;
+    if (paymentMethod === 'wallet') {
+        // For wallets, we need to get a redirect URL
+        await triggerWalletPayment(paymentKey, walletPhoneNumber);
+        responseData.paymentUrl = null; // Wallets don't use an iframe
+        responseData.message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
+    } else {
+        // For cards, we build the iframe URL
+        paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+    }
 
     // --- 4. Return payment URL and details to client ---
     return success(
       res,
-      { paymentUrl, paymentKey, orderId },
-      "Payment initiated successfully"
+      responseData,
+      "تم إنشاء رابط الدفع بنجاح"
     );
   } catch (err) {
     // --- 5. Handle errors gracefully ---
     return error(
       res,
-      "Failed to initiate payment",
+      "فشل في بدء الدفع",
       500,
       err?.response?.data || err.message
     );
