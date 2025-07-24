@@ -1,9 +1,9 @@
 import {
   created,
   notFound,
-  validationError,
   error,
   success,
+  paginated,
 } from "../../utils/apiResponse.js";
 import { asyncHandler } from "../../utils/apiError.js";
 import Enrollment from "../../../DB/models/enrollment.js";
@@ -17,18 +17,14 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
 
   // 2. Find associated profiles
   const student = await Student.findOne({ userId }).select({ _id: 1 });
-  if (!student) return notFound(res, "Student profile not found");
+  if (!student) return notFound(res, "الطالب غير موجود");
 
   const halaka = await Halaka.findById(halakaId);
-  if (!halaka) return notFound(res, "Halaka not found");
+  if (!halaka) return notFound(res, "الحلقة غير موجودة");
 
   // 3. Controller-level check: Is this the correct endpoint for this halaka type?
   if (halaka.halqaType !== "halqa") {
-    return error(
-      res,
-      "This enrollment process is for group halaqas only.",
-      400
-    );
+    return error(res, "هذه العملية للتسجيل مخصصة فقط للحلقات الجماعية.", 400);
   }
 
   // 4. Create the enrollment. The pre-save hook will handle all business logic validation.
@@ -78,7 +74,7 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   return created(
     res,
     paymentDetails,
-    "Enrollment initiated. Please proceed to payment."
+    "تم التسجيل في الحلقة بنجاح. يرجى إتمام عملية الدفع."
   );
 });
 
@@ -88,13 +84,18 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
 export const getPendingInvitations = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const student = await Student.findOne({ userId }).select("_id");
-  if (!student) return notFound(res, "Student profile not found");
+  if (!student) return notFound(res, "الطالب غير موجود");
+
+  // Determine status filter
+  const statusParam = req.query.status;
+  const statusFilter =
+    statusParam === "pending_payment" ? "pending_payment" : "pending_action";
 
   // Pagination
   const features = new (await import("../../utils/apiFeatures.js")).default(
     Enrollment.find({
       student: student._id,
-      status: "pending_action",
+      status: statusFilter,
     }).populate(EnrollmentService.invitationPopulation),
     req.query
   )
@@ -105,13 +106,29 @@ export const getPendingInvitations = asyncHandler(async (req, res) => {
   // Total count for pagination
   const total = await Enrollment.countDocuments({
     student: student._id,
-    status: "pending_action",
+    status: statusFilter,
   });
 
   // Format response
   const data = enrollments.map(EnrollmentService.formatInvitation);
 
-  return success(res, { data, total }, "تم استرجاع الدعوات المعلقة بنجاح.");
+  // Calculate pagination metadata
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = 10;
+  const totalPages = Math.ceil(total / limit);
+
+  return paginated(
+    res,
+    { data, total },
+    {
+      page,
+      limit,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+    "تم استرجاع الدعوات بنجاح."
+  );
 });
 
 // GET /api/v1/enrollments/invitations/:id - Get single invitation details for the authenticated student
@@ -127,7 +144,6 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
   }).populate(EnrollmentService.invitationPopulation);
 
   if (!enrollment) return notFound(res, "Invitation not found");
-
 
   return success(
     res,
@@ -154,7 +170,7 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
   }).populate(EnrollmentService.invitationPopulation);
 
   if (!enrollment) {
-    return notFound(res, "Invitation not found or already actioned");
+    return notFound(res, "الدعوة غير موجودة أو تم اتخاذ إجراء عليها بالفعل");
   }
 
   // Process the invitation action (accept/reject)
@@ -185,5 +201,3 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
 
   return success(res, result.data, result.message);
 });
-
-
