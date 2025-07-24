@@ -176,4 +176,64 @@ export const getHalakaDetails = async (req, res) => {
         console.error('Get Halaka Details Error:', err);
         return error(res, 'حدث خطأ أثناء جلب تفاصيل الحلقة', 500, err);
     }
-}; 
+};
+
+// إحصائيات لوحة الطالب
+export const getStudentDashboardStats = async (req, res) => {
+    try {
+        const student = await Student.findOne({ userId: req.user._id });
+        if (!student) {
+            return error(res, 'الطالب غير موجود', 404);
+        }
+
+        const filter = {
+            $or: [
+                { student: student._id },
+                { students: student._id },
+                { 'enrolledStudents': student._id },
+            ]
+        };
+
+        const halakat = await Halaka.find(filter).populate('teacher');
+
+        // Total halakat enrolled
+        const totalHalakat = halakat.length;
+
+        // Halakat scheduled for today
+        const today = new Date();
+        const todayDay = today.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+        const halakatToday = halakat.filter(h =>
+            h.schedule?.days?.includes(todayDay)
+        ).length;
+
+        // Unique teachers
+        const teacherIds = new Set(halakat.map(h => String(h.teacher?._id)));
+        const totalTeachers = teacherIds.size;
+
+        // Study hours this week
+        let weekHours = 0;
+        halakat.forEach(h => {
+            if (!h.schedule) return;
+            let freq = h.schedule.frequency || "weekly";
+            let daysPerWeek = h.schedule.days?.length || 0;
+            let weeklyMultiplier =
+                freq === "daily" ? 7 : freq === "biweekly" ? 0.5 : 1;
+            weekHours +=
+                (daysPerWeek * (h.schedule.duration || 0) * weeklyMultiplier) / 60;
+        });
+
+        return success(
+            res,
+            {
+                totalHalakat,
+                halakatToday,
+                totalTeachers,
+                weekHours: Math.round(weekHours * 10) / 10,
+            },
+            'تم جلب إحصائيات لوحة الطالب بنجاح'
+        );
+    } catch (err) {
+        console.error('Student Dashboard Stats Error:', err);
+        return error(res, 'حدث خطأ أثناء جلب إحصائيات لوحة الطالب', 500, err);
+    }
+};
