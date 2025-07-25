@@ -168,9 +168,15 @@ export const sendGroupMessage = asyncHandler(async (req, res) => {
     conversation.message.push(newMessage._id);
     await Promise.all([conversation.save(), newMessage.save()]);
 
+    // This ensures the frontend receives the full sender object, not just an ID.
+    const populatedMessage = await newMessage.populate({
+        path: "senderId",
+        select: "firstName lastName profilePicture",
+    });
+
     // Emit to all group participants in real time
     emitGroupMessage(groupId, "groupMessage", {
-        message: newMessage,
+        message: populatedMessage,
         groupId,
     });
 
