@@ -169,22 +169,22 @@ export const initiatePayment = asyncHandler(async (req, res) => {
 
     // Build payment URL (iframe) https://accept.paymob.com/api
     let responseData = { paymentKey, orderId, paymentMethod };
-    let paymentUrl;
+    let message = "تم إنشاء رابط الدفع بنجاح";
     if (paymentMethod === 'wallet') {
         // For wallets, we need to get a redirect URL
         await triggerWalletPayment(paymentKey, walletPhoneNumber);
         responseData.paymentUrl = null; // Wallets don't use an iframe
-        responseData.message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
+        message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
     } else {
         // For cards, we build the iframe URL
-        paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+        responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
     }
 
     // --- 4. Return payment URL and details to client ---
     return success(
       res,
       responseData,
-      "تم إنشاء رابط الدفع بنجاح"
+      message,
     );
   } catch (err) {
     // --- 5. Handle errors gracefully ---
