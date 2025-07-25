@@ -299,13 +299,3 @@ export const getTodayHalakatForStudent = async (req, res) => {
         return error(res, "فشل في جلب الحلقات المجدولة اليوم", 500, err);
     }
 };
-
-// Helper function (should exist in your utils, or add here if not)function calculateEndTime(startTime, duration) {
-// function calculateEndTime(startTime, duration) {
-//     if (!startTime || !duration) return null;
-//     const [hours, minutes] = startTime.split(':').map(Number);
-//     const start = new Date();
-//     start.setHours(hours, minutes, 0, 0);
-//     const end = new Date(start.getTime() + duration * 60000);
-//     return end.toTimeString().slice(0, 5);
-// }
