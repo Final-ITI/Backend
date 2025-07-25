@@ -259,11 +259,40 @@ export const getHalakatByTeacher = async (req, res) => {
       return error(res, "لم يتم العثور على المعلم", 403);
     }
 
-    const halakat = await Halaka.find({ teacher: teacher._id }).sort({
-      createdAt: -1,
-    });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    return success(res, halakat, "تم جلب الحلقات بنجاح");
+    const filter = { teacher: teacher._id };
+    const totalItems = await Halaka.countDocuments(filter);
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Old-style, just fetch the docs, optionally populate
+    const halakat = await Halaka.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "teacher",
+        populate: { path: "userId", select: "firstName lastName profileImage" },
+      });
+
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    // The format here is: { success, message, data, pagination }
+    return res.status(200).json({
+      success: true,
+      message: "تم جلب الحلقات بنجاح",
+      data: halakat,
+      pagination,
+    });
   } catch (err) {
     return error(res, "فشل في جلب الحلقات", 500, err);
   }
@@ -283,12 +312,25 @@ export const getTodayHalakatForTeacher = async (req, res) => {
     const todayUtc = new Date();
     todayUtc.setUTCHours(0, 0, 0, 0);
 
-    const halakat = await Halaka.find({
+    // Pagination
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Query filter
+    const filter = {
       teacher: teacher._id,
       "schedule.days": todayName,
       "schedule.startDate": { $lte: todayUtc },
       "schedule.endDate": { $gte: todayUtc },
-    });
+    };
+
+    // Get total count for pagination
+    const totalItems = await Halaka.countDocuments(filter);
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Fetch paginated data
+    const halakat = await Halaka.find(filter).skip(skip).limit(limit);
 
     const mapped = halakat.map((h) => {
       const endTime = calculateEndTime(
@@ -314,7 +356,22 @@ export const getTodayHalakatForTeacher = async (req, res) => {
       };
     });
 
-    return success(res, mapped, "تم جلب الحلقات المجدولة اليوم بنجاح");
+    // Add pagination info to response
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "تم جلب الحلقات المجدولة اليوم بنجاح",
+      data: mapped,
+      pagination,
+    });
   } catch (err) {
     console.error(err);
     return error(res, "فشل في جلب الحلقات المجدولة اليوم", 500, err);
