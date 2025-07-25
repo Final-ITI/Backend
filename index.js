@@ -4,7 +4,8 @@ import connectionDB from "./DB/connection.js";
 import { appRouter } from "./src/app.router.js";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
-import { userSocketMap, initSocket } from "./src/socket/socket.js";
+import {  initSocket } from "./src/socket/socket.js";
+import {  scheduleDeductCreditsJob } from "./src/cron/jobs.js";
 
 dotenv.config();
 const app = express();
@@ -21,6 +22,7 @@ const io = new SocketIOServer(httpServer, {
 connectionDB();
 appRouter(app, express);
 initSocket(io);
+scheduleDeductCreditsJob();
 
 const port = process.env.PORT || 4000;
 httpServer.listen(port, () => {
