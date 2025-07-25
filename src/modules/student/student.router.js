@@ -3,7 +3,7 @@ import { authenticate, authorize } from '../../middlewares/auth.middleware.js';
 import { validate } from '../../middlewares/validation.middleware.js';
 import { updateStudentProfileValidation } from './student.profile.validation.js';
 import { getStudentProfile, updateStudentProfile } from './student.profile.controller.js';
-import { getHalakaDetails, getMyHalakat , getStudentDashboardStats } from './student.controller.js';
+import { getHalakaDetails, getMyHalakat , getStudentDashboardStats, getTodayHalakatForStudent } from './student.controller.js';
 
 const router = Router();
 
@@ -12,6 +12,9 @@ router.get('/my-halakat', authenticate, authorize('student'), getMyHalakat);
 
 
 router.get('/dashboard/stats', authenticate, authorize('student') ,getStudentDashboardStats);
+
+
+router.get('/today-halakat', authenticate, authorize('student') ,getTodayHalakatForStudent);
 
 // جلب تفاصيل حلقة معينة للطالب
 router.get('/halaka-details/:halakaId', authenticate, authorize('student', 'teacher'), getHalakaDetails);
