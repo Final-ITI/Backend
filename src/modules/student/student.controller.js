@@ -1,4 +1,4 @@
-import Halaka, { getAllSessionDates } from '../../../DB/models/halaka.js';
+import Halaka, { getAllSessionDates ,calculateEndTime } from '../../../DB/models/halaka.js';
 import Student from '../../../DB/models/student.js';
 import Teacher from '../../../DB/models/teacher.js';
 import User from '../../../DB/models/user.js';
@@ -299,5 +299,3 @@ export const getTodayHalakatForStudent = async (req, res) => {
         return error(res, "فشل في جلب الحلقات المجدولة اليوم", 500, err);
     }
 };
-
-// Helper function (should exist in your utils, or add here if not)
