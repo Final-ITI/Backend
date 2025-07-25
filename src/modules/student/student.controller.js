@@ -237,3 +237,67 @@ export const getStudentDashboardStats = async (req, res) => {
         return error(res, 'حدث خطأ أثناء جلب إحصائيات لوحة الطالب', 500, err);
     }
 };
+
+// جلب الحلقات المجدولة اليوم للطالب
+export const getTodayHalakatForStudent = async (req, res) => {
+    try {
+        const student = await Student.findOne({ userId: req.user._id });
+        if (!student) return error(res, "لم يتم العثور على الطالب", 403);
+
+        const now = new Date();
+        const todayName = now
+            .toLocaleString("en-US", { weekday: "long" })
+            .toLowerCase();
+        const todayUtc = new Date();
+        todayUtc.setUTCHours(0, 0, 0, 0);
+
+        // Find halakat where the student is enrolled and scheduled for today
+        const filter = {
+            $and: [
+                {
+                    $or: [
+                        { student: student._id },
+                        { students: student._id },
+                        { enrolledStudents: student._id }
+                    ]
+                },
+                { "schedule.days": todayName },
+                { "schedule.startDate": { $lte: todayUtc } },
+                { "schedule.endDate": { $gte: todayUtc } }
+            ]
+        };
+
+        const halakat = await Halaka.find(filter).populate('teacher');
+
+        const mapped = halakat.map((h) => {
+            const endTime = calculateEndTime(
+                h.schedule.startTime,
+                h.schedule.duration
+            );
+
+            let numberOfStudents = 0;
+            if (h.halqaType === "halqa") {
+                numberOfStudents = Array.isArray(h.students)
+                    ? h.students.length
+                    : h.currentStudents || 0;
+            } else if (h.halqaType === "private") {
+                numberOfStudents = h.student ? 1 : 0;
+            }
+
+            return {
+                title: h.title,
+                startTime: h.schedule.startTime,
+                endTime,
+                numberOfStudents,
+                zoomMeeting: h.zoomMeeting || {},
+            };
+        });
+
+        return success(res, mapped, "تم جلب الحلقات المجدولة اليوم بنجاح");
+    } catch (err) {
+        console.error(err);
+        return error(res, "فشل في جلب الحلقات المجدولة اليوم", 500, err);
+    }
+};
+
+// Helper function (should exist in your utils, or add here if not)
