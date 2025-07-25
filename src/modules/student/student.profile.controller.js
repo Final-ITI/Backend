@@ -19,7 +19,7 @@ export const getStudentProfile = asyncHandler(async (req, res) => {
         lastName: user?.lastName,
         email: user?.email,
         phone: user?.phone,
-        birthdate: student.birthdate,
+        birthDate: student.birthDate ,
         address: user?.address,
         guardianName: student.guardianName,
         guardianPhone: student.guardianPhone
@@ -32,8 +32,8 @@ export const updateStudentProfile = asyncHandler(async (req, res) => {
     const student = await Student.findOne({ userId: req.user._id });
     if (!student) throw new ApiError('لم يتم العثور على الطالب', 404);
 
-    const { birthdate, guardianName, guardianPhone } = req.body;
-    if (birthdate) student.birthdate = birthdate;
+    const { birthDate, guardianName, guardianPhone } = req.body;
+    if (birthDate) student.birthDate = birthDate;
     if (guardianName) student.guardianName = guardianName;
     if (guardianPhone) student.guardianPhone = guardianPhone;
     await student.save();
@@ -61,7 +61,7 @@ export const updateStudentProfile = asyncHandler(async (req, res) => {
         lastName: user?.lastName,
         email: user?.email,
         phone: user?.phone,
-        birthdate: student.birthdate,
+        birthDate: student.birthDate,
         address: user?.address,
         guardianName: student.guardianName,
         guardianPhone: student.guardianPhone
