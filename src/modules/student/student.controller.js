@@ -1,4 +1,4 @@
-import Halaka, { getAllSessionDates } from '../../../DB/models/halaka.js';
+import Halaka, { getAllSessionDates ,calculateEndTime } from '../../../DB/models/halaka.js';
 import Student from '../../../DB/models/student.js';
 import Teacher from '../../../DB/models/teacher.js';
 import User from '../../../DB/models/user.js';
@@ -300,4 +300,12 @@ export const getTodayHalakatForStudent = async (req, res) => {
     }
 };
 
-// Helper function (should exist in your utils, or add here if not)
+// Helper function (should exist in your utils, or add here if not)function calculateEndTime(startTime, duration) {
+// function calculateEndTime(startTime, duration) {
+//     if (!startTime || !duration) return null;
+//     const [hours, minutes] = startTime.split(':').map(Number);
+//     const start = new Date();
+//     start.setHours(hours, minutes, 0, 0);
+//     const end = new Date(start.getTime() + duration * 60000);
+//     return end.toTimeString().slice(0, 5);
+// }
