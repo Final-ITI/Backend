@@ -66,7 +66,7 @@ const userSchema = new Schema(
     // Address Information
     address: String,
     country: { type: String, default: "Egypt" },
-    
+
     activationCodeEmail: String,
 
     isEmailVerified: {
@@ -106,7 +106,7 @@ const userSchema = new Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-    transform: function(doc, ret) {
+    transform: function (doc, ret) {
       // Remove sensitive fields from the output
       ret.id = ret._id; // Add id field
       delete ret._id;
@@ -116,7 +116,7 @@ const userSchema = new Schema(
       delete ret.passwordResetToken; // Do not expose reset token
       delete ret.lockUntil; // Do not expose lockUntil
       return ret;
-    }
+    },
   }
 );
 
@@ -177,11 +177,12 @@ userSchema.post("save", async function (doc) {
         });
       }
     } catch (error) {
-      throw new Error(`Error creating ${doc.userType} profile: ${error.message}`);
+      throw new Error(
+        `Error creating ${doc.userType} profile: ${error.message}`
+      );
     }
   }
 });
-
 
 // Instance method to check password
 userSchema.methods.correctPassword = async function (

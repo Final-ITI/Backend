@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Wallet API provides endpoints for teachers to manage their wallet balance, payout requests, and banking information.
+The Wallet API provides endpoints for teachers to manage their wallet balance, payout requests, and banking information. It also includes super admin endpoints for managing payout requests.
 
 ## Authentication
 
-All endpoints require authentication with a Bearer token and teacher role authorization.
+All endpoints require authentication with a Bearer token and appropriate role authorization (teacher or superadmin).
 
-## Endpoints
+## Teacher Endpoints
 
 ### 1. Get Wallet Balance
 
@@ -238,6 +238,138 @@ GET /api/v1/wallet/payout-requests?page=1&limit=5&status=pending
 }
 ```
 
+## Super Admin Endpoints
+
+### 6. Get All Payout Requests (Admin)
+
+**GET** `/api/v1/wallet/admin/payout-requests`
+
+Get all payout requests for admin review and management.
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**Access:** Super Admin only
+
+**Query Parameters:**
+
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 10, max: 100)
+- `status` (optional): Filter by status (pending, approved, rejected, completed)
+
+**Example:**
+
+```
+GET /api/v1/wallet/admin/payout-requests?page=1&limit=10&status=pending
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "تم جلب طلبات السحب بنجاح",
+  "data": {
+    "payoutRequests": [
+      {
+        "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
+        "amount": 500,
+        "status": "pending",
+        "createdAt": "2024-01-15T10:30:00.000Z",
+        "updatedAt": "2024-01-15T10:30:00.000Z",
+        "teacher": {
+          "_id": "64f8a1b2c3d4e5f6a7b8c9d1",
+          "fullName": "Ahmed Mohamed",
+          "email": "ahmed@example.com",
+          "bankingInfo": {
+            "bankName": "Commercial International Bank",
+            "accountHolderName": "Ahmed Mohamed",
+            "accountNumber": "1234567890123456",
+            "iban": "EG123456789012345678901234",
+            "swiftCode": "CIBEEGCX",
+            "isVerified": false
+          }
+        },
+        "processedBy": null,
+        "adminNotes": null
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 5,
+      "totalItems": 50,
+      "itemsPerPage": 10
+    }
+  }
+}
+```
+
+### 7. Update Payout Request Status (Admin)
+
+**PATCH** `/api/v1/wallet/admin/payout-requests/:id`
+
+Approve or reject a payout request.
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Access:** Super Admin only
+
+**URL Parameters:**
+
+- `id`: Payout request ID
+
+**Request Body:**
+
+```json
+{
+  "action": "approved",
+  "adminNotes": "Payment processed successfully"
+}
+```
+
+**For Rejection:**
+
+```json
+{
+  "action": "rejected",
+  "adminNotes": "Insufficient documentation provided",
+  "rejectionReason": "Please provide additional verification documents"
+}
+```
+
+**Validation Rules:**
+
+- `action`: Required, must be "approved" or "rejected"
+- `adminNotes`: Optional, max 500 characters
+- `rejectionReason`: Required when action is "rejected", 10-200 characters
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "تم الموافقة طلب السحب بنجاح",
+  "data": {
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
+    "teacher": "64f8a1b2c3d4e5f6a7b8c9d1",
+    "amount": 500,
+    "status": "completed",
+    "processedBy": "64f8a1b2c3d4e5f6a7b8c9d2",
+    "adminNotes": "Payment processed successfully",
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T11:00:00.000Z"
+  }
+}
+```
+
 ## Error Responses
 
 ### Validation Error (400)
@@ -311,6 +443,13 @@ GET /api/v1/wallet/payout-requests?page=1&limit=5&status=pending
 }
 ```
 
+```json
+{
+  "status": "error",
+  "message": "طلب السحب غير موجود"
+}
+```
+
 ## Business Rules
 
 1. **Minimum Payout Amount**: 200 EGP
@@ -324,25 +463,40 @@ GET /api/v1/wallet/payout-requests?page=1&limit=5&status=pending
 7. **Account Number**: Must be exactly 16 digits
 8. **IBAN Validation**: Must follow international IBAN format
 9. **SWIFT Code**: Must be 8 or 11 characters
+10. **Admin Actions**: Only super admins can approve/reject payout requests
+11. **Status Flow**: pending → approved/rejected → completed (for approved)
 
 ## Database Transactions
 
-The payout request creation uses MongoDB transactions to ensure:
+The payout request creation and status updates use MongoDB transactions to ensure:
 
 - Atomic operations (all succeed or all fail)
 - Data consistency between wallet balance and payout requests
 - Prevention of race conditions
 
+## Status Management
+
+### Payout Request Statuses:
+
+- **pending**: Request submitted, waiting for admin review
+- **approved**: Admin approved the request
+- **rejected**: Admin rejected the request
+- **completed**: Payment processed (for approved requests)
+
+### Admin Actions:
+
+- **approved**: Moves status to "completed", clears pending amount
+- **rejected**: Moves status to "rejected", returns amount to available balance
+
 ## Testing
 
 ### Test Cases
 
-1. **Get Balance**: Verify wallet creation for new teachers
-2. **Banking Info**: Test CRUD operations for banking information
-3. **Create Payout**: Test with valid/invalid amounts and banking info validation
-4. **Get History**: Test pagination and status filtering
-5. **Error Handling**: Test validation errors and business rule violations
-6. **Transactions**: Test concurrent payout requests
+1. **Teacher Endpoints**: Verify wallet creation, banking info management, payout requests
+2. **Admin Endpoints**: Test payout request review and status updates
+3. **Validation**: Test all validation rules and error messages
+4. **Transactions**: Test concurrent operations and rollback scenarios
+5. **Authorization**: Test role-based access control
 
 ### Sample Test Data
 
@@ -359,10 +513,19 @@ The payout request creation uses MongoDB transactions to ensure:
 }
 ```
 
-### Validation Test Cases
+### Admin Test Scenarios
 
-1. **Bank Name**: Test Arabic and English characters, special characters
-2. **Account Number**: Test exactly 16 digits, non-numeric characters
-3. **IBAN**: Test valid/invalid IBAN formats
-4. **SWIFT Code**: Test 8 and 11 character formats
-5. **Amount**: Test minimum amount, insufficient balance scenarios
+```json
+// Approve request
+{
+  "action": "approved",
+  "adminNotes": "Payment processed successfully"
+}
+
+// Reject request
+{
+  "action": "rejected",
+  "adminNotes": "Documentation incomplete",
+  "rejectionReason": "Please provide additional verification documents"
+}
+```

@@ -143,7 +143,7 @@ export const getPayoutRequests = asyncHandler(async (req, res) => {
   const teacher = await Teacher.findOne({ userId: req.user._id });
 
   if (!teacher) {
-    return error(res, "Teacher profile not found", 404);
+    return error(res, "المعلم غير موجود", 404);
   }
 
   const teacherId = teacher._id;
@@ -251,4 +251,160 @@ export const updateMyBankingInfo = asyncHandler(async (req, res) => {
     teacherProfile.bankingInfo,
     "Banking information updated successfully."
   );
+});
+
+// --- ADMIN FUNCTIONS FOR PAYOUT REQUESTS ---
+/**
+ * @desc    Get all payout requests for admin review
+ */
+
+export const getAllPayoutRequests = asyncHandler(async (req, res) => {
+  const { status, page = 1, limit = 10 } = req.query;
+
+  // Build query with filters
+  const query = {};
+  if (status) query.status = status;
+
+  const [requests, total] = await Promise.all([
+    PayoutRequest.find(query)
+      .populate({
+        path: "teacher",
+        select: "userId bankingInfo",
+        populate: { path: "userId", select: "firstName lastName email" },
+      })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    PayoutRequest.countDocuments(query),
+  ]);
+
+  const payoutRequests = requests.map((request) => {
+    const { teacher } = request;
+    const user = teacher?.userId;
+
+    return {
+      _id: request._id,
+      amount: request.amount,
+      status: request.status,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      teacher: {
+        _id: teacher?._id,
+        fullName: user ? `${user.firstName} ${user.lastName}` : "Unknown",
+        email: user?.email,
+        bankingInfo: {
+          bankName:
+            request.bankingInfo?.bankName || teacher?.bankingInfo?.bankName,
+          accountHolderName:
+            request.bankingInfo?.accountHolderName ||
+            teacher?.bankingInfo?.accountHolderName,
+          accountNumber:
+            request.bankingInfo?.accountNumber ||
+            teacher?.bankingInfo?.accountNumber,
+          iban: request.bankingInfo?.iban || teacher?.bankingInfo?.iban,
+          swiftCode:
+            request.bankingInfo?.swiftCode || teacher?.bankingInfo?.swiftCode,
+          isVerified:
+            request.bankingInfo?.isVerified ||
+            teacher?.bankingInfo?.isVerified ||
+            false,
+        },
+      },
+      processedBy: request.processedBy,
+      adminNotes: request.adminNotes,
+    };
+  });
+
+  return success(
+    res,
+    {
+      payoutRequests,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: parseInt(limit),
+      },
+    },
+    "تم جلب طلبات السحب بنجاح"
+  );
+});
+
+/**
+ * @desc    Update a payout request status (approve/reject)
+ */
+export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
+  const { id: requestId } = req.params;
+  const { action, adminNotes } = req.body; // action can be 'approve' or 'reject'
+  const adminId = req.user._id;
+
+  const payoutRequest = await PayoutRequest.findById(requestId);
+  if (!payoutRequest) {
+    return notFound(res, "طلب السحب غير موجود");
+  }
+  if (payoutRequest.status !== "pending") {
+    return error(
+      res,
+      `هذه الطلبية هي بالفعل '${payoutRequest.status}' ولا يمكن تغييرها.`,
+      400
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    let walletUpdate;
+
+    if (action === "approved") {
+      payoutRequest.status = "completed";
+      // On approval, the pending amount is cleared as the money has been sent externally.
+      walletUpdate = { $inc: { payoutsPending: -payoutRequest.amount } };
+    } else {
+      // action === 'reject'
+      payoutRequest.status = "rejected";
+      // On rejection, the money is returned from pending to the available balance.
+      walletUpdate = {
+        $inc: {
+          payoutsPending: -payoutRequest.amount,
+          balance: payoutRequest.amount,
+        },
+      };
+    }
+
+    payoutRequest.processedBy = adminId;
+    payoutRequest.adminNotes = adminNotes;
+
+    // Operation 1: Update the wallet
+    const updatedWallet = await TeacherWallet.findOneAndUpdate(
+      { teacher: payoutRequest.teacher },
+      walletUpdate,
+      { session, new: true }
+    );
+
+    if (!updatedWallet) {
+      throw new ApiError("محفظة المعلم غير موجودة أو لم يتم تحديثها.", 404);
+    }
+
+    // Operation 2: Update the payout request
+    await payoutRequest.save({ session });
+
+    // If both succeed, commit the transaction
+    await session.commitTransaction();
+
+    // (Optional) Send notification to the teacher about the status update
+    // sendNotification(...)
+
+    return success(
+      res,
+      payoutRequest,
+      `تم ${action === "approved" ? "الموافقة" : "رفض"} طلب السحب بنجاح.`
+    );
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("Update Payout Status Error:", err);
+    return error(res, err.message || "Failed to update payout request.", 500);
+  } finally {
+    session.endSession();
+  }
 });

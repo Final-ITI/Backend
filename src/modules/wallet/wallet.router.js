@@ -7,11 +7,15 @@ import {
   getPayoutRequests,
   getMyBankingInfo,
   updateMyBankingInfo,
+  getAllPayoutRequests,
+  updatePayoutRequestStatus,
 } from "./wallet.controller.js";
 import {
   createPayoutRequestValidation,
   getPayoutRequestsValidation,
   updateBankingInfoValidation,
+  getAllPayoutRequestsValidation,
+  updatePayoutRequestStatusValidation,
 } from "./wallet.validation.js";
 
 const router = Router();
@@ -31,7 +35,7 @@ router.post(
 // GET /api/v1/wallet/payout-requests - Get the history of payout requests
 router.get(
   "/payout-requests",
-  authenticate, 
+  authenticate,
   authorize("teacher"),
   validate(getPayoutRequestsValidation),
   getPayoutRequests
@@ -52,6 +56,25 @@ router.put(
   authorize("teacher"),
   validate(updateBankingInfoValidation),
   updateMyBankingInfo
+);
+
+// ---- Super Admin Routes ----
+// GET /api/v1/wallet/admin/payout-requests - Get all payout requests for admin review
+router.get(
+  "/admin/payout-requests",
+  authenticate,
+  authorize("superadmin"),
+  validate(getAllPayoutRequestsValidation),
+  getAllPayoutRequests
+);
+
+// PATCH /api/v1/wallet/admin/payout-requests/:id - Update a payout request status (approve/reject)
+router.patch(
+  "/admin/payout-requests/:id",
+  authenticate,
+  authorize("superadmin"),
+  validate(updatePayoutRequestStatusValidation),
+  updatePayoutRequestStatus
 );
 
 export default router;
