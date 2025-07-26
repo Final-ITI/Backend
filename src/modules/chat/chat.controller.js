@@ -11,7 +11,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     const senderId = req.user._id;
 
     if (!message || !receiverId) {
-        throw new ApiError("Message content and receiver ID are required", 400);
+        throw new ApiError("محتوى الرسالة ومعرّف المستلم مطلوبان", 400);
     }
 
     let conversation = await Conversation.findOne({
@@ -55,7 +55,7 @@ export const getMessages = asyncHandler(async (req, res) => {
     const senderId = req.user._id;
 
     if (!userToChatId) {
-        throw new ApiError("User to chat with is required", 400);
+        throw new ApiError("مطلوب تحديد المستخدم للمحادثة معه", 400);
     }
 
     const conversation = await Conversation.findOne({
@@ -135,7 +135,7 @@ export const markAsRead = asyncHandler(async (req, res) => {
     );
 
     console.log("markAsRead result:", result);
-    res.status(200).json({ success: true, modifiedCount: result.modifiedCount });
+    res.status(200).json({ success: true, modifiedCount: result.modifiedCount, message: "تم تعليم الرسائل كمقروءة بنجاح" });
 });
 
 export const sendGroupMessage = asyncHandler(async (req, res) => {
@@ -144,13 +144,13 @@ export const sendGroupMessage = asyncHandler(async (req, res) => {
     const senderId = req.user._id;
 
     if (!message || !groupId) {
-        throw new ApiError("Message content and group ID are required", 400);
+        throw new ApiError("محتوى الرسالة ومعرّف المجموعة مطلوبان", 400);
     }
 
     const chatGroup = await ChatGroup.findById(groupId);
-    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup) throw new ApiError("المجموعة غير موجودة", 404);
     if (!chatGroup.participants.map(id => id.toString()).includes(senderId.toString())) {
-        throw new ApiError("You are not a participant in this group", 403);
+        throw new ApiError("أنت لست مشاركاً في هذه المجموعة", 403);
     }
 
     let conversation = await Conversation.findOne({ chatGroup: groupId });
@@ -188,9 +188,9 @@ export const getGroupMessages = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
     const chatGroup = await ChatGroup.findById(groupId);
-    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup) throw new ApiError("المجموعة غير موجودة", 404);
     if (!chatGroup.participants.map(id => id.toString()).includes(userId.toString())) {
-        throw new ApiError("You are not a participant in this group", 403);
+        throw new ApiError("أنت لست مشاركاً في هذه المجموعة", 403);
     }
 
     const conversation = await Conversation.findOne({ chatGroup: groupId }).populate({
@@ -211,9 +211,9 @@ export const getGroupInfo = asyncHandler(async (req, res) => {
         path: "participants",
         select: "firstName lastName profilePicture"
     });
-    if (!chatGroup) throw new ApiError("Chat group not found", 404);
+    if (!chatGroup) throw new ApiError("المجموعة غير موجودة", 404);
     if (!chatGroup.participants.map(p => p._id.toString()).includes(userId.toString())) {
-        throw new ApiError("You are not a participant in this group", 403);
+        throw new ApiError("أنت لست مشاركاً في هذه المجموعة", 403);
     }
     res.status(200).json(chatGroup);
 });

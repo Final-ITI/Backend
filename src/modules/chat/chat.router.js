@@ -9,7 +9,7 @@ const router = express.Router();
 router.post(
   "/send/:id",
   authenticate,
-  validate([body("message").notEmpty().withMessage("Message content is required")]),
+  validate([body("message").notEmpty().withMessage("محتوى الرسالة مطلوب")]),
   sendMessage
 );
 
@@ -20,11 +20,11 @@ router.post("/:id/read", authenticate, markAsRead);
 router.post(
   "/group/:groupId/message",
   authenticate,
-  validate([body("message").notEmpty().withMessage("Message content is required")]),
+  validate([body("message").notEmpty().withMessage("محتوى الرسالة مطلوب")]),
   sendGroupMessage
 );
 
 router.get("/group/:groupId/messages", authenticate, getGroupMessages);
 router.get("/group/:groupId", authenticate, getGroupInfo);
 
-export default router; 
+export default router;

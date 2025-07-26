@@ -18,7 +18,7 @@ export const register = asyncHandler(async (req, res) => {
   // Check Email
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    throw new ApiError("Email already exists", 400);
+    throw new ApiError("البريد الإلكتروني مستخدم من قبل", 400);
   }
 
   // Generate activation code
@@ -54,13 +54,13 @@ export const register = asyncHandler(async (req, res) => {
     email,
     activationCode: activationCodeEmail,
   });
-  if (!isSent) throw new ApiError("Failed to send activation email", 500);
+  if (!isSent) throw new ApiError("فشل في إرسال بريد التفعيل", 500);
 
   // Send response
   created(
     res,
     null,
-    `${role} registered successfully. Please check your email to activate your account.`
+    `${role === "student" ? "تم تسجيل الطالب بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب." : "تم تسجيل المعلم بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب."}`
   );
 });
 
@@ -72,7 +72,7 @@ export const activateEmail = asyncHandler(async (req, res) => {
   try {
     decoded = jwt.verify(activationCodeEmail, process.env.JWT_SECRET);
   } catch (error) {
-    throw new ApiError("Invalid or expired activation code", 400);
+    throw new ApiError("رمز التفعيل غير صالح أو منتهي الصلاحية", 400);
   }
 
   // Find user
@@ -81,10 +81,10 @@ export const activateEmail = asyncHandler(async (req, res) => {
     { isEmailVerified: true, $unset: { activationCodeEmail: 1 } },
     { new: true }
   );
-  if (!user) throw new ApiError("User not found or already activated", 404);
+  if (!user) throw new ApiError("المستخدم غير موجود أو تم تفعيل الحساب مسبقاً", 404);
 
   // Send response
-  success(res, null, "Email activated successfully. You can now log in.");
+  success(res, null, "تم تفعيل البريد الإلكتروني بنجاح. يمكنك الآن تسجيل الدخول.");
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -92,14 +92,12 @@ export const login = asyncHandler(async (req, res) => {
 
   // Find user by email and include password for comparison
   const user = await User.findOne({ email }).select("+password");
-  // --- (Same robust checks as before: user exists, password correct, not locked, etc.) ---
   if (!user || !(await user.correctPassword(password, user.password))) {
-    // Handle failed login attempts and locking (your existing logic is great here)
-    throw new ApiError("Invalid email or password", 401);
+    throw new ApiError("البريد الإلكتروني أو كلمة المرور غير صحيحة", 401);
   }
   // Check if email is verified
   if (!user.isEmailVerified) {
-    throw new ApiError("Please verify your email before logging in", 401);
+    throw new ApiError("يرجى تفعيل البريد الإلكتروني قبل تسجيل الدخول", 401);
   }
 
   // Check if account is locked
@@ -109,7 +107,7 @@ export const login = asyncHandler(async (req, res) => {
     if (lockTime > now) {
       const remainingMinutes = Math.ceil((lockTime - now) / (1000 * 60));
       throw new ApiError(
-        `Account is temporarily locked. Try again in ${remainingMinutes} minutes.`,
+        `تم قفل الحساب مؤقتاً. حاول مرة أخرى بعد ${remainingMinutes} دقيقة.`,
         423
       );
     }
@@ -118,19 +116,15 @@ export const login = asyncHandler(async (req, res) => {
   // Verify password
   const isPasswordCorrect = await user.correctPassword(password, user.password);
   if (!isPasswordCorrect) {
-    // Increment login attempts
     await user.incLoginAttempts();
-
-    // Check if account should be locked after failed attempt
     const updatedUser = await User.findById(user._id);
     if (updatedUser.isLocked) {
       throw new ApiError(
-        "Too many failed login attempts. Account locked for 2 hours.",
+        "عدد محاولات تسجيل الدخول تجاوز الحد المسموح. تم قفل الحساب لمدة ساعتين.",
         423
       );
     }
-
-    throw new ApiError("Invalid email or password", 401);
+    throw new ApiError("البريد الإلكتروني أو كلمة المرور غير صحيحة", 401);
   }
 
   // Reset login attempts on successful login
@@ -171,25 +165,25 @@ export const login = asyncHandler(async (req, res) => {
 
   const refreshTokenExpires = new Date(
     Date.now() +
-      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+    parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
   );
 
   // Store tokens in database
   await Token.create({
     user: user._id,
     tokenType: "refresh",
-    token: refreshToken, // The raw token is hashed by the pre-save hook
+    token: refreshToken,
     expiresAt: refreshTokenExpires,
-    deviceInfo: { userAgent, ipAddress /* ...other info */ },
+    deviceInfo: { userAgent, ipAddress },
     tenantId: user.tenantId,
   });
 
   // --- Send Refresh Token as a secure cookie ---
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true, // Prevents client-side JS from accessing the cookie
-    secure: process.env.NODE_ENV === "production", // Only send over HTTPS
-    sameSite: "strict", // Mitigates CSRF attacks
-    maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000,
   });
 
   // Prepare user data for response (exclude sensitive information)
@@ -204,6 +198,14 @@ export const login = asyncHandler(async (req, res) => {
     tenantId: user.tenantId,
     lastLogin: user.lastLogin,
   };
+
+  // If the logged-in user is a teacher, add isVerified status
+  if (user.userType === 'teacher') {
+    const teacher = await Teacher.findOne({ userId: user._id });
+    if (teacher) {
+      userData.isVerified = teacher.isVerified;
+    }
+  }
 
   // Send response
   success(
@@ -220,7 +222,7 @@ export const login = asyncHandler(async (req, res) => {
         ipAddress,
       },
     },
-    "Login successful"
+    "تم تسجيل الدخول بنجاح"
   );
 });
 
@@ -228,74 +230,61 @@ export const logout = asyncHandler(async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (refreshToken) {
-    // Revoke the token in the database, ignoring if it fails (e.g., already invalid)
     await Token.revokeToken(refreshToken, "user_logout", req.user?._id).catch(
-      () => {}
+      () => { }
     );
   }
 
-  // Clear the cookie on the client side
   res.cookie("refreshToken", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    expires: new Date(0), // Set expiry to a past date to delete it
+    expires: new Date(0),
   });
 
-  success(res, null, "Logged out successfully");
+  success(res, null, "تم تسجيل الخروج بنجاح");
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {
-  // 1. Get refresh token from the cookie
   const incomingRefreshToken = req.cookies.refreshToken;
   if (!incomingRefreshToken) {
-    throw new ApiError("Refresh token not found.", 401);
+    throw new ApiError("رمز التحديث غير موجود.", 401);
   }
 
-  // 2. Find the valid token in the DB
   const tokenDoc = await Token.findValidToken(incomingRefreshToken, "refresh");
 
   if (!tokenDoc) {
-    // This could mean the token was stolen and used. In a high-security scenario,
-    // you might want to invalidate all tokens for this user.
     throw new ApiError(
-      "Invalid or expired refresh token. Please log in again.",
+      "رمز التحديث غير صالح أو منتهي الصلاحية. يرجى تسجيل الدخول مرة أخرى.",
       403
     );
   }
 
-  const { user } = tokenDoc; // The user is populated from findValidToken
+  const { user } = tokenDoc;
 
-  // 3. Check user status
   if (!user) {
-    throw new ApiError("User not found.", 401);
+    throw new ApiError("المستخدم غير موجود.", 401);
   }
 
-  // --- Implement Refresh Token Rotation ---
-
-  // 4. Revoke the old refresh token
   await tokenDoc.revoke("token_refresh");
 
-  // 5. Generate new pair of tokens
   const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
     generateTokens(user._id, user.userType, user.tenantId);
 
-  // 6. Store the new refresh token in the DB
   const newRefreshTokenExpires = new Date(
     Date.now() +
-      parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000
+    parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000
   );
   await Token.create({
     user: user._id,
     tokenType: "refresh",
     token: newRefreshToken,
     expiresAt: newRefreshTokenExpires,
-    deviceInfo: tokenDoc.deviceInfo, // Reuse device info
+    deviceInfo: tokenDoc.deviceInfo,
     tenantId: user.tenantId,
     refreshTokenChain: { previousToken: tokenDoc._id },
   });
 
-  // 7. Send the new refresh token in a new cookie
   res.cookie("refreshToken", newRefreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -303,40 +292,37 @@ export const refreshToken = asyncHandler(async (req, res) => {
     maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000,
   });
 
-  // 8. Send the new access token in the response
   success(
     res,
     { accessToken: newAccessToken },
-    "Tokens refreshed successfully"
+    "تم تحديث الرموز بنجاح"
   );
 });
 
 export const logoutAllDevices = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  // Revoke all user tokens
   await Token.revokeAllUserTokens(userId, "user_logout_all", userId);
 
-  success(res, null, "Logged out from all devices successfully");
+  success(res, null, "تم تسجيل الخروج من جميع الأجهزة بنجاح");
 });
 
 export const forgetPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
   const user = await User.findOne({ email });
-  if (!user) return notFound(res, "User not found");
+  if (!user) return notFound(res, "المستخدم غير موجود");
 
   try {
     await AuthMailService.sendResetCodeEmail(user);
-    return success(res, null, "Reset code sent to your email.");
+    return success(res, null, "تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني.");
   } catch (err) {
-    // Clean up on failure
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     user.passwordResetIsVerified = false;
     await user.save();
 
-    return error(res, "Failed to send reset code", 500, {
+    return error(res, "فشل في إرسال رمز إعادة التعيين", 500, {
       message: err.message,
       stack: err.stack,
     });
@@ -352,12 +338,12 @@ export const verifyResetCode = asyncHandler(async (req, res) => {
     passwordResetExpires: { $gt: Date.now() },
   });
 
-  if (!user) return error(res, "Invalid or expired reset code", 400);
+  if (!user) return error(res, "رمز إعادة التعيين غير صالح أو منتهي الصلاحية", 400);
 
   user.passwordResetIsVerified = true;
   await user.save();
 
-  return success(res, null, "Reset code verified successfully.");
+  return success(res, null, "تم التحقق من رمز إعادة التعيين بنجاح.");
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {
@@ -370,10 +356,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    return error(res, "Invalid or expired reset code", 400);
+    return error(res, "رمز إعادة التعيين غير صالح أو منتهي الصلاحية", 400);
   }
 
-  // Update user password
   user.password = newPassword;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
@@ -381,23 +366,20 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.passwordChangedAt = Date.now();
   await user.save();
 
-  // Generate tokens
   const { accessToken, refreshToken } = generateTokens(
     user._id,
     user.userType,
     user.tenantId
   );
 
-  // Set token expiration times
   const accessTokenExpires = new Date(
     Date.now() + parseInt(process.env.ACCESS_TOKEN_EXPIRES || "15") * 60 * 1000
   );
   const refreshTokenExpires = new Date(
     Date.now() +
-      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+    parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
   );
 
-  // Get device info
   const userAgent = req.headers["user-agent"];
   const ipAddress = req.ip || req.connection.remoteAddress;
   const deviceType = detectDeviceType(userAgent);
@@ -411,7 +393,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
     os,
   };
 
-  // Store tokens in database
   const [accessTokenDoc, refreshTokenDoc] = await Promise.all([
     Token.createToken({
       user: user._id,
@@ -431,14 +412,12 @@ export const resetPassword = asyncHandler(async (req, res) => {
     }),
   ]);
 
-  // Link refresh token chain
   if (accessTokenDoc && refreshTokenDoc) {
     refreshTokenDoc.refreshTokenChain.previousToken = null;
     refreshTokenDoc.refreshTokenChain.nextToken = null;
     await refreshTokenDoc.save();
   }
 
-  // Prepare user data
   const userData = {
     _id: user._id,
     firstName: user.firstName,
@@ -451,7 +430,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
     lastLogin: user.lastLogin,
   };
 
-  // Send success response
   return success(
     res,
     {
@@ -469,6 +447,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
         ipAddress,
       },
     },
-    "Password reset successfully."
+    "تم إعادة تعيين كلمة المرور بنجاح."
   );
 });
