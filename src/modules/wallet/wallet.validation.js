@@ -98,7 +98,7 @@ export const updatePayoutRequestStatusValidation = [
     .notEmpty()
     .withMessage("حالة الطلب مطلوبة")
     .isIn(["approved", "rejected", "completed"])
-    .withMessage("حالة الطلب يجب أن تكون: approved أو rejected"),
+    .withMessage("حالة الطلب يجب أن تكون: approved أو rejected أو completed"),
   body("adminNotes")
     .optional()
     .isString()

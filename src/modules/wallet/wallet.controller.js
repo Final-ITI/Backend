@@ -59,6 +59,15 @@ export const createPayoutRequest = asyncHandler(async (req, res) => {
       400
     );
   }
+
+  // Check if banking information is verified
+//   if (!teacher.bankingInfo.isVerified) {
+//     return error(
+//       res,
+//       "معلومات البنك الخاصة بك لم يتم التحقق منها بعد. يرجى الانتظار حتى يتم التحقق من المعلومات من قبل الإدارة.",
+//       400
+//     );
+//   }
   const wallet = await TeacherWallet.findOne({ teacher: teacher._id });
   const MIN_PAYOUT_AMOUNT = 200;
   if (amount < MIN_PAYOUT_AMOUNT) {
@@ -71,6 +80,17 @@ export const createPayoutRequest = asyncHandler(async (req, res) => {
   if (!wallet || wallet.balance < amount) {
     return error(res, "رصيد غير كاف متاح.", 400);
   }
+
+  // Additional security check: Ensure the requested amount doesn't exceed available balance
+  if (wallet && wallet.balance < amount) {
+    return error(
+      res,
+      `المبلغ المطلوب (${amount}) يتجاوز الرصيد المتاح (${wallet.balance}).`,
+      400
+    );
+  }
+
+  // Check for existing pending request
   const existingPendingRequest = await PayoutRequest.findOne({
     teacher: teacher._id,
     status: "pending",
@@ -331,7 +351,7 @@ export const getAllPayoutRequests = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Update a payout request status (approve/reject)
+ * @desc    Update a payout request status (approve/reject/complete)
  */
 export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
   const { id: requestId } = req.params;
@@ -341,17 +361,26 @@ export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
   const payoutRequest = await PayoutRequest.findById(requestId);
   if (!payoutRequest) return notFound(res, "طلب السحب غير موجود");
 
-  // --- UPDATED LOGIC TO HANDLE THE FULL WORKFLOW ---
-  let walletUpdate;
+  // Prevent processing already completed or rejected requests
+  if (
+    payoutRequest.status === "completed" ||
+    payoutRequest.status === "rejected"
+  ) {
+    return error(
+      res,
+      `لا يمكن تعديل الطلب في الحالة '${payoutRequest.status}'.`,
+      400
+    );
+  }
+
+  // --- CORRECTED LOGIC TO HANDLE THE PROPER WORKFLOW ---
+  let walletUpdate = {};
   let newStatus;
   let successMessage;
 
   if (action === "approved") {
-    if (
-      payoutRequest.status !== "pending" &&
-      payoutRequest.status !== "completed" &&
-      payoutRequest.status !== "rejected"
-    ) {
+    // Step 1: Approval - Only pending requests can be approved
+    if (payoutRequest.status !== "pending") {
       return error(
         res,
         `يمكن الموافقة فقط على الطلبات المعلقة. الحالة الحالية: '${payoutRequest.status}'.`,
@@ -359,9 +388,10 @@ export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
       );
     }
     newStatus = "approved";
-    walletUpdate = {}; // No change to wallet on approval
+    // No wallet changes on approval - amount stays in payoutsPending
     successMessage = "تمت الموافقة على طلب السحب بنجاح.";
   } else if (action === "completed") {
+    // Step 2: Completion - Only approved requests can be completed
     if (payoutRequest.status !== "approved") {
       return error(
         res,
@@ -370,14 +400,12 @@ export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
       );
     }
     newStatus = "completed";
-    // On completion, the pending amount is cleared as the money has been sent.
+    // On completion, clear the pending amount as the money has been sent
     walletUpdate = { $inc: { payoutsPending: -payoutRequest.amount } };
     successMessage = "تمت معالجة طلب السحب بنجاح.";
   } else if (action === "rejected") {
-    if (
-      payoutRequest.status !== "pending" &&
-      payoutRequest.status !== "completed"
-    ) {
+    // Rejection - Only pending requests can be rejected
+    if (payoutRequest.status !== "pending") {
       return error(
         res,
         `يمكن رفض الطلبات المعلقة فقط. الحالة الحالية: '${payoutRequest.status}'.`,
@@ -385,7 +413,7 @@ export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
       );
     }
     newStatus = "rejected";
-    // On rejection, the money is returned to the available balance.
+    // On rejection, return the money to the available balance
     walletUpdate = {
       $inc: {
         payoutsPending: -payoutRequest.amount,
