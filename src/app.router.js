@@ -17,6 +17,7 @@ import notificationRouter from "./modules/notification/notification.router.js";
 import reviewRouter from "./modules/review/review.router.js";
 import studentRouter from "./modules/student/student.router.js";
 import paymentRouter from "./modules/payment/payment.router.js";
+import walletRouter from "./modules/wallet/wallet.router.js";
 import cronRouter from "./test/cron/test.router.js"; // Import the test cron router
 
 export const appRouter = (app, express) => {
@@ -49,6 +50,7 @@ export const appRouter = (app, express) => {
   app.use("/api/v1/reviews", reviewRouter);
   app.use("/api/v1/student", studentRouter);
   app.use("/api/v1/payment", paymentRouter);
+  app.use("/api/v1/wallet", walletRouter);
 
   // ---- TEST ----
   app.use("/api/v1/test", cronRouter);

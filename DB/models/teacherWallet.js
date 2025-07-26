@@ -10,8 +10,9 @@ const teacherWalletSchema = new Schema(
       required: true,
       unique: true,
     },
-    balance: { type: Number, required: true, default: 0 }, // الرصيد القابل للسحب
-    pendingBalance: { type: Number, required: true, default: 0 }, // رصيد معلق (اختياري، يمكن استخدامه مستقبلاً)
+    balance: { type: Number, required: true, default: 0 }, // Available balance can withdraw
+    pendingBalance: { type: Number, required: true, default: 0 }, // pay from halakat
+    payoutsPending: { type: Number, required: true, default: 0 }, // pay that request for teacher and waiting for admin approval
     currency: { type: String, default: "EGP" },
   },
   { timestamps: true }

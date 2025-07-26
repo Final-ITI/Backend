@@ -299,7 +299,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
       // c. Update the teacher's wallet
       await TeacherWallet.findOneAndUpdate(
         { teacher: enrollment.halaka.teacher },
-        { $inc: { balance: netAmount } },
+        { $inc: { pendingBalance: netAmount } },
         { upsert: true, new: true } // upsert: true creates a new wallet if it doesn't exist
       );
 
