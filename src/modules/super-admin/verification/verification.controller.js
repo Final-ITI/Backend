@@ -131,7 +131,7 @@ export const getTeacherVerificationDetails = asyncHandler(async (req, res) => {
     })
     .lean();
 
-  if (!teacher) throw new ApiError("Teacher not found", 404);
+  if (!teacher) throw new ApiError("المعلم غير موجود", 404);
 
   // Transform the response to match the required structure
   const transformedResponse = {
@@ -182,10 +182,10 @@ export const reviewDocument = asyncHandler(async (req, res) => {
   const document = await Document.findById(documentId).select(
     "status reviewDate reviewer"
   );
-  if (!document) throw new ApiError("Document not found", 404);
+  if (!document) throw new ApiError("المستند غير موجود", 404);
 
   if (document.status !== "pending") {
-    throw new ApiError("Document is not pending for approval", 400);
+    throw new ApiError("المستند ليس قيد الانتظار للموافقة", 400);
   }
 
   document.status = action === "approve" ? "approved" : "rejected";
@@ -218,7 +218,7 @@ export const updateTeacherVerificationStatus = asyncHandler(
     if (!teacher) throw new ApiError("Teacher not found", 404);
 
     if (teacher.verificationStatus !== "pending") {
-      throw new ApiError("Teacher verification is not pending", 400);
+      throw new ApiError("حالة التحقق للمعلم ليست قيد الانتظار", 400);
     }
 
     // Update all teacher's documents
