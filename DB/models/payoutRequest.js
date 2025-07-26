@@ -67,6 +67,12 @@ const payoutRequestSchema = new Schema(
   }
 );
 
+// INDEXES
+payoutRequestSchema.index({ teacher: 1 });
+payoutRequestSchema.index({ status: 1 });
+payoutRequestSchema.index({ createdAt: -1 });
+payoutRequestSchema.index({ processedBy: 1 });
+
 const PayoutRequest =
   mongoose.models.PayoutRequest ||
   mongoose.model("PayoutRequest", payoutRequestSchema);

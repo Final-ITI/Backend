@@ -1,4 +1,4 @@
-import { body, query } from "express-validator";
+import { body, query, param } from "express-validator";
 
 export const createPayoutRequestValidation = [
   body("amount")
@@ -73,4 +73,49 @@ export const getPayoutRequestsValidation = [
     .optional()
     .isIn(["pending", "approved", "rejected", "completed"])
     .withMessage("حالة الطلب غير صحيحة"),
+];
+
+// Admin validation for getting all payout requests
+export const getAllPayoutRequestsValidation = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("رقم الصفحة يجب أن يكون رقم موجب"),
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("عدد العناصر يجب أن يكون بين 1 و 100"),
+  query("status")
+    .optional()
+    .isIn(["pending", "approved", "rejected", "completed"])
+    .withMessage("حالة الطلب غير صحيحة"),
+];
+
+// Admin validation for updating payout request status
+export const updatePayoutRequestStatusValidation = [
+  param("id").isMongoId().withMessage("معرف طلب السحب غير صالح"),
+  body("action")
+    .notEmpty()
+    .withMessage("حالة الطلب مطلوبة")
+    .isIn(["approved", "rejected", "completed"])
+    .withMessage("حالة الطلب يجب أن تكون: approved أو rejected أو completed"),
+  body("adminNotes")
+    .optional()
+    .isString()
+    .withMessage("ملاحظات الإدارة يجب أن تكون نص")
+    .isLength({ max: 500 })
+    .withMessage("ملاحظات الإدارة يجب ألا تتجاوز 500 حرف"),
+  body("rejectionReason")
+    .if(body("status").equals("rejected"))
+    .notEmpty()
+    .withMessage("سبب الرفض مطلوب عند رفض الطلب")
+    .isString()
+    .withMessage("سبب الرفض يجب أن يكون نص")
+    .isLength({ min: 10, max: 200 })
+    .withMessage("سبب الرفض يجب أن يكون بين 10 و 200 حرف"),
+  //   body("completedAt")
+  //     .if(body("status").equals("completed"))
+  //     .optional()
+  //     .isISO8601()
+  //     .withMessage("تاريخ الإنجاز غير صالح - يجب أن يكون بصيغة ISO 8601"),
 ];
