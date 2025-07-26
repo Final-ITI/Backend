@@ -541,6 +541,7 @@ export const getAllHalakat = async (req, res) => {
         },
         curriculum: halaka.curriculum,
         price: halaka.price,
+        totalPrice: halaka.totalPrice,
         currency: "ج.م",
         maxStudents: halaka.maxStudents,
         currentStudents: halaka.currentStudents,
