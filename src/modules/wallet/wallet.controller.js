@@ -335,71 +335,97 @@ export const getAllPayoutRequests = asyncHandler(async (req, res) => {
  */
 export const updatePayoutRequestStatus = asyncHandler(async (req, res) => {
   const { id: requestId } = req.params;
-  const { action, adminNotes } = req.body; // action can be 'approve' or 'reject'
+  const { action, adminNotes } = req.body;
   const adminId = req.user._id;
 
   const payoutRequest = await PayoutRequest.findById(requestId);
-  if (!payoutRequest) {
-    return notFound(res, "طلب السحب غير موجود");
-  }
-  if (payoutRequest.status !== "pending") {
-    return error(
+  if (!payoutRequest) return notFound(res, "طلب السحب غير موجود");
+
+  // --- UPDATED LOGIC TO HANDLE THE FULL WORKFLOW ---
+  let walletUpdate;
+  let newStatus;
+  let successMessage;
+
+  if (action === "approved") {
+    if (
+      payoutRequest.status !== "pending" &&
+      payoutRequest.status !== "completed" &&
+      payoutRequest.status !== "rejected"
+    ) {
+      return error(
+        res,
+        `يمكن الموافقة فقط على الطلبات المعلقة. الحالة الحالية: '${payoutRequest.status}'.`,
+        400
+      );
+    }
+    newStatus = "approved";
+    walletUpdate = {}; // No change to wallet on approval
+    successMessage = "تمت الموافقة على طلب السحب بنجاح.";
+  } else if (action === "completed") {
+    if (payoutRequest.status !== "approved") {
+      return error(
+        res,
+        `يمكن إكمال الطلبات المعتمدة فقط. الحالة الحالية: '${payoutRequest.status}'.`,
+        400
+      );
+    }
+    newStatus = "completed";
+    // On completion, the pending amount is cleared as the money has been sent.
+    walletUpdate = { $inc: { payoutsPending: -payoutRequest.amount } };
+    successMessage = "تمت معالجة طلب السحب بنجاح.";
+  } else if (action === "rejected") {
+    if (
+      payoutRequest.status !== "pending" &&
+      payoutRequest.status !== "completed"
+    ) {
+      return error(
+        res,
+        `يمكن رفض الطلبات المعلقة فقط. الحالة الحالية: '${payoutRequest.status}'.`,
+        400
+      );
+    }
+    newStatus = "rejected";
+    // On rejection, the money is returned to the available balance.
+    walletUpdate = {
+      $inc: {
+        payoutsPending: -payoutRequest.amount,
+        balance: payoutRequest.amount,
+      },
+    };
+    successMessage = "تم رفض طلب السحب بنجاح.";
+  } else {
+    return validationError(
       res,
-      `هذه الطلبية هي بالفعل '${payoutRequest.status}' ولا يمكن تغييرها.`,
+      "إجراء غير صالح. يجب أن يكون 'approved' أو 'rejected' أو 'completed'.",
       400
     );
   }
 
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
-    let walletUpdate;
-
-    if (action === "approved") {
-      payoutRequest.status = "completed";
-      // On approval, the pending amount is cleared as the money has been sent externally.
-      walletUpdate = { $inc: { payoutsPending: -payoutRequest.amount } };
-    } else {
-      // action === 'reject'
-      payoutRequest.status = "rejected";
-      // On rejection, the money is returned from pending to the available balance.
-      walletUpdate = {
-        $inc: {
-          payoutsPending: -payoutRequest.amount,
-          balance: payoutRequest.amount,
-        },
-      };
-    }
-
+    // Update the payout request
+    payoutRequest.status = newStatus;
     payoutRequest.processedBy = adminId;
-    payoutRequest.adminNotes = adminNotes;
-
-    // Operation 1: Update the wallet
-    const updatedWallet = await TeacherWallet.findOneAndUpdate(
-      { teacher: payoutRequest.teacher },
-      walletUpdate,
-      { session, new: true }
-    );
-
-    if (!updatedWallet) {
-      throw new ApiError("محفظة المعلم غير موجودة أو لم يتم تحديثها.", 404);
-    }
-
-    // Operation 2: Update the payout request
+    payoutRequest.adminNotes = adminNotes || payoutRequest.adminNotes;
     await payoutRequest.save({ session });
 
-    // If both succeed, commit the transaction
+    // Update the wallet if necessary
+    if (Object.keys(walletUpdate).length > 0) {
+      const updatedWallet = await TeacherWallet.findOneAndUpdate(
+        { teacher: payoutRequest.teacher },
+        walletUpdate,
+        { session, new: true }
+      );
+      if (!updatedWallet)
+        throw new ApiError("محفظة المعلم غير موجودة أو لم يتم تحديثها.", 404);
+    }
+
     await session.commitTransaction();
 
     // (Optional) Send notification to the teacher about the status update
-    // sendNotification(...)
 
-    return success(
-      res,
-      payoutRequest,
-      `تم ${action === "approved" ? "الموافقة" : "رفض"} طلب السحب بنجاح.`
-    );
+    return success(res, payoutRequest, successMessage);
   } catch (err) {
     await session.abortTransaction();
     console.error("Update Payout Status Error:", err);

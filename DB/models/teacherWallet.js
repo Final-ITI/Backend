@@ -18,6 +18,11 @@ const teacherWalletSchema = new Schema(
   { timestamps: true }
 );
 
+// INDEX
+teacherWalletSchema.index({ teacher: 1 });
+teacherWalletSchema.index({ balance: 1 });
+teacherWalletSchema.index({ payoutsPending: 1 });
+
 const TeacherWallet =
   mongoose.models.TeacherWallet ||
   mongoose.model("TeacherWallet", teacherWalletSchema);
