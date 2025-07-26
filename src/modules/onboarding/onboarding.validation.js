@@ -4,7 +4,7 @@ import { isValidObjectId } from "../../middlewares/validation.middleware.js";
 export const profileValidation = [
   body("specialization")
     .notEmpty()
-    .withMessage("Specialization is required.")
+    .withMessage("التخصص مطلوب.")
     .isIn([
       "quran_memorization",
       "quran_recitation",
@@ -15,43 +15,43 @@ export const profileValidation = [
       "aqeedah",
     ])
     .withMessage(
-      "Specialization must be one of: quran_memorization, quran_recitation, tajweed, arabic_language, fiqh, hadith, aqeedah"
+      "يجب أن يكون التخصص أحد الخيارات التالية: quran_memorization, quran_recitation, tajweed, arabic_language, fiqh, hadith, aqeedah"
     )
     .trim()
     .escape(),
 
   body("bio")
     .notEmpty()
-    .withMessage("Bio is required.")
+    .withMessage("النبذة الذاتية مطلوبة.")
     .isLength({ max: 500 })
-    .withMessage("Bio cannot exceed 500 characters.")
+    .withMessage("لا يمكن أن تتجاوز النبذة الذاتية 500 حرف.")
     .trim()
     .escape(),
 
   body("skills")
     .notEmpty()
-    .withMessage("Skills are required.")
+    .withMessage("المهارات مطلوبة.")
     .isLength({ max: 200 })
-    .withMessage("Skills cannot exceed 200 characters.")
+    .withMessage("لا يمكن أن تتجاوز المهارات 200 حرف.")
     .trim()
     .escape(),
 
   body("experience")
     .notEmpty()
-    .withMessage("Experience is required.")
+    .withMessage("الخبرة مطلوبة.")
     .isInt({ min: 0, max: 50 })
-    .withMessage("Experience must be between 0 and 50 years.")
+    .withMessage("يجب أن تتراوح الخبرة بين 0 و 50 عامًا.")
     .toInt()
     .trim()
     .escape(),
 
   body("sessionPrice")
     .notEmpty()
-    .withMessage("Session price is required.")
+    .withMessage("سعر الجلسة مطلوب.")
     .isNumeric()
-    .withMessage("Session price must be a number.")
+    .withMessage("يجب أن يكون سعر الجلسة رقمًا.")
     .isFloat({ min: 1 })
-    .withMessage("Session price must be at least 1.")
+    .withMessage("يجب أن يكون سعر الجلسة 1 على الأقل.")
     .toFloat()
     .trim()
     .escape(),
@@ -67,11 +67,11 @@ export const profileValidation = [
 
   body("id_number")
     .notEmpty()
-    .withMessage("ID number is required.")
+    .withMessage("رقم الهوية مطلوب.")
     .isString()
-    .withMessage("ID number must be a string.")
+    .withMessage("يجب أن يكون رقم الهوية سلسلة نصية.")
     .isLength({ min: 14, max: 14 })
-    .withMessage("ID number must be exactly 14 characters long.")
+    .withMessage("يجب أن يتكون رقم الهوية من 14 حرفًا بالضبط.")
     .trim()
     .escape(),
 ];
@@ -79,7 +79,7 @@ export const profileValidation = [
 export const documentUploadValidation = [
   body("docType")
     .notEmpty()
-    .withMessage("Document type is required.")
+    .withMessage("نوع المستند مطلوب.")
     .isIn([
       "national_id_front",
       "national_id_back",
@@ -89,7 +89,7 @@ export const documentUploadValidation = [
       "other",
     ])
     .withMessage(
-      "Document type must be one of: national_id_front, national_id_back, birth_certificate, guardian_id, teacher_certificate, other"
+      "يجب أن يكون نوع المستند أحد الخيارات التالية: national_id_front, national_id_back, birth_certificate, guardian_id, teacher_certificate, other"
     )
     .trim()
     .escape(),
@@ -98,13 +98,13 @@ export const documentUploadValidation = [
 export const deleteDocumentValidation = [
   param("docId")
     .notEmpty()
-    .withMessage("Document ID is required.")
+    .withMessage("معرف المستند مطلوب.")
     .isString()
-    .withMessage("Document ID must be a string.")
+    .withMessage("يجب أن يكون معرف المستند سلسلة نصية.")
     .custom((value) => {
       return isValidObjectId(value);
     })
-    .withMessage("Invalid document ID format.")
+    .withMessage("صيغة معرف المستند غير صالحة.")
     .trim()
     .escape(),
 ];

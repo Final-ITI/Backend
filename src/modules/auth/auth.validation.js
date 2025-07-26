@@ -3,23 +3,23 @@ import { body, param } from "express-validator";
 export const registerValidation = [
   body("firstName")
     .notEmpty()
-    .withMessage("First name is required.")
+    .withMessage("الاسم الأول مطلوب.")
     .isLength({ min: 2, max: 50 })
-    .withMessage("First name must be between 2 and 50 characters long.")
+    .withMessage("يجب أن يتراوح طول الاسم الأول بين 2 و 50 حرفًا.")
     .trim()
     .escape(),
 
   body("lastName")
     .notEmpty()
-    .withMessage("Last name is required.")
+    .withMessage("اسم العائلة مطلوب.")
     .isLength({ min: 2, max: 50 })
-    .withMessage("Last name must be between 2 and 50 characters long.")
+    .withMessage("يجب أن يتراوح طول اسم العائلة بين 2 و 50 حرفًا.")
     .trim()
     .escape(),
 
   body("email")
     .isEmail()
-    .withMessage("Please enter a valid email address.")
+    .withMessage("الرجاء إدخال عنوان بريد إلكتروني صالح.")
     // .custom((value) => {
     //   const lowerCaseEmail = value.toLowerCase();
     //   if (
@@ -35,12 +35,12 @@ export const registerValidation = [
   body("password")
     .matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[#?!@$%^&*-]).{8,}$/)
     .withMessage(
-      "Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number and one special character (#?!@$%^&*-)."
+      "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل، وتحتوي على حرف كبير واحد على الأقل، وحرف صغير واحد، ورقم واحد، وحرف خاص واحد (#?!@$%^&*-)."
     ),
 
   body("confirmPassword").custom((value, { req }) => {
     if (value !== req.body.password) {
-      throw new Error("Confirm password does not match.");
+      throw new Error("تأكيد كلمة المرور غير متطابق.");
     }
     return true;
   }),
@@ -48,20 +48,20 @@ export const registerValidation = [
   body("role")
     .notEmpty()
     .isIn(["student", "teacher"])
-    .withMessage("Role must be either 'student' or 'teacher'.")
+    .withMessage("يجب أن يكون الدور 'طالب' أو 'معلم'.")
     .trim()
     .escape(),
 
   body("gender")
     .notEmpty()
     .isIn(["male", "female"])
-    .withMessage("Gender must be either 'male' or 'female'."),
+    .withMessage("يجب أن يكون الجنس 'ذكر' أو 'أنثى'."),
 
   body("country")
     .notEmpty()
-    .withMessage("Country is required.")
+    .withMessage("الدولة مطلوبة.")
     .isLength({ min: 2, max: 50 })
-    .withMessage("Country must be between 2 and 50 characters long.")
+    .withMessage("يجب أن يتراوح طول اسم الدولة بين 2 و 50 حرفًا.")
     .trim()
     .escape(),
 ];
@@ -69,9 +69,9 @@ export const registerValidation = [
 export const activateCodeEmailValidation = [
   param("activationCodeEmail")
     .notEmpty()
-    .withMessage("Activation code is required.")
+    .withMessage("رمز التفعيل مطلوب.")
     .isString()
-    .withMessage("Activation code must be a string.")
+    .withMessage("يجب أن يكون رمز التفعيل سلسلة نصية.")
     .trim()
     .escape(),
 ];
@@ -79,10 +79,10 @@ export const activateCodeEmailValidation = [
 export const loginValidation = [
   body("email")
     .isEmail()
-    .withMessage("Please enter a valid email address.")
+    .withMessage("الرجاء إدخال عنوان بريد إلكتروني صالح.")
     .normalizeEmail(),
 
-  body("password").notEmpty().withMessage("Password is required."),
+  body("password").notEmpty().withMessage("كلمة المرور مطلوبة."),
 ];
 
 

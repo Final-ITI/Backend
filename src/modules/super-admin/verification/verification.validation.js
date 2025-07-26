@@ -1,4 +1,4 @@
-import {  body, param } from "express-validator";
+import { body, param } from "express-validator";
 import { query } from "express-validator";
 import { isValidObjectId } from "../../../middlewares/validation.middleware.js";
 
@@ -6,41 +6,41 @@ export const getVerificationRequestsValidation = [
   query("page")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Page must be a positive integer"),
-    
+    .withMessage("يجب أن تكون الصفحة رقمًا صحيحًا موجبًا"),
+
   query("verificationStatus")
     .optional()
     .isIn(["pending", "approved", "rejected"])
-    .withMessage("Invalid verification status"),
-    
+    .withMessage("حالة التحقق غير صالحة"),
+
   query("q")
     .optional()
     .isLength({ min: 2, max: 100 })
-    .withMessage("Search query must be between 2-100 characters")
+    .withMessage("يجب أن يتراوح طول استعلام البحث بين 2 و 100 حرف")
     .trim(),
 ];
 
 const createIdValidator = (paramName, fieldName) => [
   param(paramName)
     .exists()
-    .withMessage(`${fieldName} ID is required`)
+    .withMessage(`معرف ${fieldName} مطلوب`)
     .custom(isValidObjectId)
-    .withMessage(`Invalid ${fieldName} ID format`),
+    .withMessage(`صيغة معرف ${fieldName} غير صالحة`),
 ];
 
-export const validateTeacherId = createIdValidator("teacherId", "Teacher");
-export const validateDocumentId = createIdValidator("documentId", "Document");
+export const validateTeacherId = createIdValidator("teacherId", "المعلم");
+export const validateDocumentId = createIdValidator("documentId", "المستند");
 
 export const updateTeacherVerificationStatusValidation = [
   param("teacherId")
     .exists()
-    .withMessage("Teacher ID is required")
+    .withMessage("معرف المعلم مطلوب")
     .custom(isValidObjectId)
-    .withMessage("Invalid Teacher ID format"),
-    
+    .withMessage("صيغة معرف المعلم غير صالحة"),
+
   body("action")
     .exists()
-    .withMessage("Action is required")
+    .withMessage("الإجراء مطلوب")
     .isIn(["approve", "reject"])
-    .withMessage("Action must be either 'approve' or 'reject'"),
+    .withMessage("يجب أن يكون الإجراء إما 'موافقة' أو 'رفض'"),
 ]

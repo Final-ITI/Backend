@@ -5,38 +5,38 @@ export const getNotificationsValidation = [
     query("page")
         .optional()
         .isInt({ min: 1 })
-        .withMessage("Page must be an integer greater than 0")
+        .withMessage("يجب أن تكون الصفحة رقمًا صحيحًا أكبر من 0")
         .toInt(),
     query("limit")
         .optional()
         .isInt({ min: 1, max: 100 })
-        .withMessage("Limit must be an integer between 1 and 100")
+        .withMessage("يجب أن يكون الحد رقمًا صحيحًا بين 1 و 100")
         .toInt(),
     query("isRead")
         .optional()
         .isBoolean()
-        .withMessage("isRead must be a boolean")
+        .withMessage("يجب أن تكون isRead قيمة منطقية")
         .toBoolean(),
     query("type")
         .optional()
         .isIn(["chat_message", "halaka_invitation", "payment_success", "system_alert"])
-        .withMessage("Invalid notification type"),
+        .withMessage("نوع الإشعار غير صالح"),
 ];
 
 // Validation for marking notification as read
 export const markNotificationAsReadValidation = [
     param("id")
         .notEmpty()
-        .withMessage("ID is required")
+        .withMessage("المعرف مطلوب")
         .isMongoId()
-        .withMessage("Invalid MongoDB ObjectId"),
+        .withMessage("معرف MongoDB غير صالح"),
 ];
 
 // Validation for deleting notification
 export const deleteNotificationValidation = [
     param("id")
         .notEmpty()
-        .withMessage("ID is required")
+        .withMessage("المعرف مطلوب")
         .isMongoId()
-        .withMessage("Invalid MongoDB ObjectId"),
+        .withMessage("معرف MongoDB غير صالح"),
 ];

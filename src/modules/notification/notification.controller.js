@@ -43,10 +43,10 @@ export const getNotifications = asyncHandler(async (req, res) => {
     isRead: notification.isRead,
     sender: notification.sender
       ? {
-          id: notification.sender._id,
-          name: `${notification.sender.firstName} ${notification.sender.lastName}`,
-          profileImage: notification.sender.profileImage,
-        }
+        id: notification.sender._id,
+        name: `${notification.sender.firstName} ${notification.sender.lastName}`,
+        profileImage: notification.sender.profileImage,
+      }
       : null,
     createdAt: notification.createdAt,
     updatedAt: notification.updatedAt,
@@ -76,10 +76,10 @@ export const markNotificationAsRead = asyncHandler(async (req, res) => {
   );
 
   if (!notification) {
-    return notFound(res, "Notification not found or not yours");
+    return notFound(res, "لم يتم العثور على الإشعار أو لا يخصك");
   }
 
-  return success(res, { isRead: true }, "Notification marked as read");
+  return success(res, { isRead: true }, "تم وضع علامة على الإشعار كمقروء");
 });
 
 export const getUnreadCount = asyncHandler(async (req, res) => {
@@ -93,7 +93,7 @@ export const getUnreadCount = asyncHandler(async (req, res) => {
   return success(
     res,
     { unreadCount: count },
-    "Unread count fetched successfully"
+    "تم جلب عدد الإشعارات غير المقروءة بنجاح"
   );
 });
 
@@ -111,8 +111,8 @@ export const deleteNotification = asyncHandler(async (req, res) => {
   });
 
   if (!notification) {
-    return notFound(res, "Notification not found or not yours");
+    return notFound(res, "لم يتم العثور على الإشعار أو لا يخصك");
   }
 
-  return success(res, null, "Notification deleted successfully");
+  return success(res, null, "تم حذف الإشعار بنجاح");
 });
