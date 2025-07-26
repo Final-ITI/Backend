@@ -199,6 +199,14 @@ export const login = asyncHandler(async (req, res) => {
     lastLogin: user.lastLogin,
   };
 
+  // If the logged-in user is a teacher, add isVerified status
+  if (user.userType === 'teacher') {
+    const teacher = await Teacher.findOne({ userId: user._id });
+    if (teacher) {
+      userData.isVerified = teacher.isVerified;
+    }
+  }
+
   // Send response
   success(
     res,
