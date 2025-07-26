@@ -22,7 +22,7 @@ const notificationSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ["chat_message", "halaka_invitation", "payment_success", "system_alert" , "private_halaka_invitation"],
+      enum: ["chat_message", "halaka_invitation", "payment_success", "system_alert" , "private_halaka_invitation",'system_alert'],
     },
 
     message: {
