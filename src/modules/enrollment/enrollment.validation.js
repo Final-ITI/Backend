@@ -4,13 +4,13 @@ import { isValidObjectId } from "../../middlewares/validation.middleware.js";
 export const enrollInHalakaValidation = [
   body("id")
     .notEmpty()
-    .withMessage("Halaka ID is required.")
+    .withMessage("معرف الحلقة مطلوب.")
     .isString()
-    .withMessage("Halaka ID must be a string.")
+    .withMessage("يجب أن يكون معرف الحلقة سلسلة نصية.")
     .custom((value) => {
       return isValidObjectId(value);
     })
-    .withMessage("Invalid Halaka ID format.")
+    .withMessage("صيغة معرف الحلقة غير صالحة.")
     .trim()
     .escape(),
 ];
@@ -18,12 +18,12 @@ export const enrollInHalakaValidation = [
 export const actOnInvitationValidation = [
   param("id")
     .notEmpty()
-    .withMessage("Enrollment ID is required.")
+    .withMessage("معرف التسجيل مطلوب.")
     .custom((value) => isValidObjectId(value))
-    .withMessage("Invalid Enrollment ID format."),
+    .withMessage("صيغة معرف التسجيل غير صالحة."),
   body("action")
     .notEmpty()
-    .withMessage("Action is required.")
+    .withMessage("الإجراء مطلوب.")
     .isIn(["accept", "reject"])
-    .withMessage("Action must be either 'accept' or 'reject'."),
+    .withMessage("يجب أن يكون الإجراء إما 'قبول' أو 'رفض'."),
 ];

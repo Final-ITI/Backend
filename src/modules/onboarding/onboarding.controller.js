@@ -9,12 +9,12 @@ export const profile = asyncHandler(async (req, res) => {
     req.user._id,
     req.body
   );
-  created(res, responseTeacher, "Profile updated successfully.");
+  created(res, responseTeacher, "تم تحديث الملف الشخصي بنجاح.");
 });
 
 export const uploadMyDocument = asyncHandler(async (req, res, next) => {
   // 1. Validate request input
-  if (!req.file) throw new ApiError("No file was uploaded.", 400);
+  if (!req.file) throw new ApiError("لم يتم تحميل أي ملف.", 400);
 
   // 2. Call the service to do the heavy lifting
   const newDocument = await TeacherService.uploadVerificationDocument(
@@ -27,7 +27,7 @@ export const uploadMyDocument = asyncHandler(async (req, res, next) => {
   success(
     res,
     newDocument,
-    "Document uploaded successfully. Analysis is in progress."
+    "تم تحميل المستند بنجاح. التحليل قيد التقدم."
   );
 });
 
@@ -39,5 +39,5 @@ export const deleteMyDocument = asyncHandler(async (req, res) => {
   );
 
   // Respond
-  success(res, null, "Document deleted successfully.");
+  success(res, null, "تم حذف المستند بنجاح.");
 });
