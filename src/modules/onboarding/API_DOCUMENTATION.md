@@ -88,13 +88,12 @@ Uploads a verification document for the teacher.
 
 #### Document Types
 
-| Value                 | Description                |
-| --------------------- | -------------------------- |
-| `national_id_front`   | Front side of national ID  |
-| `national_id_back`    | Back side of national ID   |
-| `certificates`        | Teacher certificate(s)     |
-| `other`               | Other supporting documents |
-
+| Value               | Description                |
+| ------------------- | -------------------------- |
+| `national_id_front` | Front side of national ID  |
+| `national_id_back`  | Back side of national ID   |
+| `certificates`      | Teacher certificate(s)     |
+| `other`             | Other supporting documents |
 
 #### Supported File Types
 
