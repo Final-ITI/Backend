@@ -134,19 +134,19 @@ enrollmentSchema.pre("save", async function (next) {
         );
       }
 
-      // 4. Business logic validation for group halaqas
-      if (halaka.halqaType === "halqa") {
-        if (halaka.currentStudents >= halaka.maxStudents) {
-          return next(new ApiError("This halaka is full.", 400));
-        }
-        // For group halaqas, add student to the halaka's students array
-        await Halaka.findByIdAndUpdate(this.halaka, {
-          $inc: { currentStudents: 1 },
-          $addToSet: { students: this.student },
-        });
-      } else if (halaka.halqaType === "private") {
-        // Logic for private halaqas
-      }
+      // // 4. Business logic validation for group halaqas
+      // if (halaka.halqaType === "halqa") {
+      //   if (halaka.currentStudents >= halaka.maxStudents) {
+      //     return next(new ApiError("This halaka is full.", 400));
+      //   }
+      //   // For group halaqas, add student to the halaka's students array
+      //   await Halaka.findByIdAndUpdate(this.halaka, {
+      //     $inc: { currentStudents: 1 },
+      //     $addToSet: { students: this.student },
+      //   });
+      // } else if (halaka.halqaType === "private") {
+      //   // Logic for private halaqas
+      // }
       // Note: We don't need to check if the type is 'private' because the controller
       // for private invitations will handle that logic separately.
     } catch (error) {

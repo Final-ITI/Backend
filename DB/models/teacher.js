@@ -132,6 +132,10 @@ const teacherSchema = new Schema(
       },
     },
     isVerified: { type: Boolean, default: false },
+    rejectionReason: {
+      type: String,
+      maxlength: [500, "Rejection reason cannot exceed 500 characters"],
+    },
     verificationStatus: {
       type: String,
       enum: ["pending", "approved", "rejected", "suspended"],

@@ -235,7 +235,6 @@ export const deleteHalaka = async (req, res) => {
     if (!halaka)
       return notFound(res, "لم يتم العثور على الحلقة أو أنها ليست ملكك");
 
-    await Session.deleteMany({ halaka: halaka._id });
     await Teacher.findByIdAndUpdate(halaka.teacher, {
       $pull: { halakat: halaka._id },
     });

@@ -14,7 +14,8 @@ import Teacher from "../../../DB/models/teacher.js";
 import Student from "../../../DB/models/student.js";
 
 export const register = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, password, gender, role, country } = req.body;
+  const { firstName, lastName, email, password, gender, role, country } =
+    req.body;
   // Check Email
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -60,7 +61,11 @@ export const register = asyncHandler(async (req, res) => {
   created(
     res,
     null,
-    `${role === "student" ? "تم تسجيل الطالب بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب." : "تم تسجيل المعلم بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب."}`
+    `${
+      role === "student"
+        ? "تم تسجيل الطالب بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب."
+        : "تم تسجيل المعلم بنجاح. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب."
+    }`
   );
 });
 
@@ -81,10 +86,15 @@ export const activateEmail = asyncHandler(async (req, res) => {
     { isEmailVerified: true, $unset: { activationCodeEmail: 1 } },
     { new: true }
   );
-  if (!user) throw new ApiError("المستخدم غير موجود أو تم تفعيل الحساب مسبقاً", 404);
+  if (!user)
+    throw new ApiError("المستخدم غير موجود أو تم تفعيل الحساب مسبقاً", 404);
 
   // Send response
-  success(res, null, "تم تفعيل البريد الإلكتروني بنجاح. يمكنك الآن تسجيل الدخول.");
+  success(
+    res,
+    null,
+    "تم تفعيل البريد الإلكتروني بنجاح. يمكنك الآن تسجيل الدخول."
+  );
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -165,7 +175,7 @@ export const login = asyncHandler(async (req, res) => {
 
   const refreshTokenExpires = new Date(
     Date.now() +
-    parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
   );
 
   // Store tokens in database
@@ -200,10 +210,16 @@ export const login = asyncHandler(async (req, res) => {
   };
 
   // If the logged-in user is a teacher, add isVerified status
-  if (user.userType === 'teacher') {
-    const teacher = await Teacher.findOne({ userId: user._id });
+  if (user.userType === "teacher") {
+    const teacher = await Teacher.findOne({ userId: user._id }).select(
+      "isVerified"
+    );
     if (teacher) {
-      userData.isVerified = teacher.isVerified;
+      userData.verificationStatus = teacher.verificationStatus;
+      // Also send the rejection reason if the status is 'rejected'
+      if (teacher.verificationStatus === "rejected") {
+        userData.rejectionReason = teacher.rejectionReason;
+      }
     }
   }
 
@@ -231,7 +247,7 @@ export const logout = asyncHandler(async (req, res) => {
 
   if (refreshToken) {
     await Token.revokeToken(refreshToken, "user_logout", req.user?._id).catch(
-      () => { }
+      () => {}
     );
   }
 
@@ -273,7 +289,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
   const newRefreshTokenExpires = new Date(
     Date.now() +
-    parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000
+      parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000
   );
   await Token.create({
     user: user._id,
@@ -292,11 +308,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
     maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES) * 24 * 60 * 60 * 1000,
   });
 
-  success(
-    res,
-    { accessToken: newAccessToken },
-    "تم تحديث الرموز بنجاح"
-  );
+  success(res, { accessToken: newAccessToken }, "تم تحديث الرموز بنجاح");
 });
 
 export const logoutAllDevices = asyncHandler(async (req, res) => {
@@ -315,7 +327,11 @@ export const forgetPassword = asyncHandler(async (req, res) => {
 
   try {
     await AuthMailService.sendResetCodeEmail(user);
-    return success(res, null, "تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني.");
+    return success(
+      res,
+      null,
+      "تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني."
+    );
   } catch (err) {
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
@@ -338,7 +354,8 @@ export const verifyResetCode = asyncHandler(async (req, res) => {
     passwordResetExpires: { $gt: Date.now() },
   });
 
-  if (!user) return error(res, "رمز إعادة التعيين غير صالح أو منتهي الصلاحية", 400);
+  if (!user)
+    return error(res, "رمز إعادة التعيين غير صالح أو منتهي الصلاحية", 400);
 
   user.passwordResetIsVerified = true;
   await user.save();
@@ -377,7 +394,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   );
   const refreshTokenExpires = new Date(
     Date.now() +
-    parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
+      parseInt(process.env.REFRESH_TOKEN_EXPIRES || "7") * 24 * 60 * 60 * 1000
   );
 
   const userAgent = req.headers["user-agent"];

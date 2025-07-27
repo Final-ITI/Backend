@@ -20,8 +20,7 @@ export function generateActivationEmail(link) {
                                     <td align="center">
                                         <!-- Islamic Motif Logo -->
                                         <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; display: inline-block; margin-bottom: 15px; line-height: 74px; text-align: center; color: white; font-weight: bold; font-size: 28px; backdrop-filter: blur(10px);">م</div>
-                                        <h1 style="margin: 10px 0 5px 0; font-size: 32px; color: #ffffff; font-weight: 300; letter-spacing: 2px;">مُعِين
-</h1>
+                                        <h1 style="margin: 10px 0 5px 0; font-size: 32px; color: #ffffff; font-weight: 300; letter-spacing: 2px;">معين</h1>
                                         <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.8); letter-spacing: 1px;">نظام تعلم القرآن</p>
                                     </td>
                                 </tr>
@@ -258,7 +257,7 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                             </table>
                         </td>
                     </tr>
-                    
+
                     <!-- Quranic Verse -->
                     <tr>
                         <td align="center" style="padding: 30px 30px 20px 30px; background-color: #f8f9fa;">
@@ -270,7 +269,7 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                             </p>
                         </td>
                     </tr>
-                    
+
                     <!-- Main Content -->
                     <tr>
                         <td align="center" style="padding: 30px 40px;">
@@ -282,18 +281,23 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                                             السلام عليكم ورحمة الله وبركاته <strong>${studentName}</strong>،<br><br>
                                             يدعوك المعلم <strong>${teacherName}</strong> للانضمام إلى حلقة خاصة في منصة معين.
                                         </p>
-                                        
+
                                         <!-- Halaka Details -->
                                         <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 4px solid #0f4c75;">
                                             <h3 style="margin: 0 0 15px 0; color: #0f4c75; font-size: 18px; text-align: center;">تفاصيل الحلقة:</h3>
                                             <div style="text-align: center; line-height: 1.8;">
                                                 <p style="margin: 8px 0; color: #495057;"><strong>اسم الحلقة:</strong> ${halakaTitle}</p>
-                                                ${halakaDescription ? `<p style="margin: 8px 0; color: #495057;"><strong>الوصف:</strong> ${halakaDescription}</p>` : ''}
-                                                <p style="margin: 8px 0; color: #495057;"><strong>المواعيد:</strong> ${formatSchedule(schedule)}</p>
+                                                ${halakaDescription
+            ? `<p style="margin: 8px 0; color: #495057;"><strong>الوصف:</strong> ${halakaDescription}</p>`
+            : ""
+        }
+                                                <p style="margin: 8px 0; color: #495057;"><strong>المواعيد:</strong> ${formatSchedule(
+            schedule
+        )}</p>
                                                 <p style="margin: 8px 0; color: #495057;"><strong>السعر:</strong> ${price} ج.م</p>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- CTA Button -->
                                         <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
                                             <tr>
@@ -310,7 +314,7 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                                                 </td>
                                             </tr>
                                         </table>
-                                        
+
                                         <!-- Fallback Text Link -->
                                         <p style="margin: 25px 0 0 0; font-size: 14px; line-height: 22px; color: #6c757d; text-align: center;">
                                             إذا لم يعمل الزر، انسخ والصق هذا الرابط في متصفحك:
@@ -322,7 +326,7 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                             </table>
                         </td>
                     </tr>
-                    
+
                     <!-- Support Note -->
                     <tr>
                         <td align="center" style="padding: 20px 40px 30px 40px;">
@@ -338,7 +342,130 @@ export function generateHalakaInvitationEmail(studentName, teacherName, halakaTi
                             </table>
                         </td>
                     </tr>
-                    
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding: 25px 20px; background: linear-gradient(135deg, #0f4c75 0%, #1e3c72 100%); color: white;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 20px; color: rgba(255,255,255,0.9);">
+                                بارك الله في رحلتك مع القرآن
+                            </p>
+                            <p style="margin: 0; font-size: 12px; line-height: 18px; color: rgba(255,255,255,0.7);">
+                                &copy; 2025 معين - نظام تعلم القرآن. جميع الحقوق محفوظة.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+`;
+}
+
+export function generateVerificationResultEmail(subject, body) {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
+    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); overflow: hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding: 40px 30px 30px 30px; background: linear-gradient(135deg, #0f4c75 0%, #1e3c72 100%); color: white;">
+                            <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <!-- Islamic Motif Logo -->
+                                        <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; display: inline-block; margin-bottom: 15px; line-height: 74px; text-align: center; color: white; font-weight: bold; font-size: 28px; backdrop-filter: blur(10px);">م</div>
+                                        <h1 style="margin: 10px 0 5px 0; font-size: 32px; color: #ffffff; font-weight: 300; letter-spacing: 2px;">معين</h1>
+                                        <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.8); letter-spacing: 1px;">نظام تعلم القرآن</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Quranic Verse -->
+                    <tr>
+                        <td align="center" style="padding: 30px 30px 20px 30px; background-color: #f8f9fa;">
+                            <p style="margin: 0; font-size: 18px; color: #0f4c75; text-align: center; font-style: italic; line-height: 28px;">
+                                "وَقُل رَّبِّ زِدْنِي عِلْمًا"
+                            </p>
+                            <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d; text-align: center;">
+                                "وقل رب زدني علما" - طه 20:114
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td align="center" style="padding: 30px 40px;">
+                            <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+                                <tr>
+                                    <td>
+                                        <h2 style="margin: 0 0 20px 0; color: #0f4c75; font-size: 24px; text-align: center; font-weight: 600;">${subject}</h2>
+                                        <div style="margin: 0 0 25px 0; font-size: 16px; line-height: 26px; color: #495057; text-align: center;">
+                                            ${body}
+                                        </div>
+
+                                        <!-- CTA Button -->
+                                        <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+                                            <tr>
+                                                <td align="center" style="padding: 25px 0;">
+                                                    <table role="presentation" border="0" cellspacing="0" cellpadding="0">
+                                                        <tr>
+                                                            <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #0f4c75 0%, #1e3c72 100%); box-shadow: 0 4px 15px rgba(15, 76, 117, 0.3);">
+                                                                <a href="${process.env.FE_URL}/teacher/dashboard" target="_blank" style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px; text-align: center; text-transform: uppercase; letter-spacing: 1px;">
+                                                                    🏠 الذهاب للوحة التحكم
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Features Preview -->
+                                        <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 4px solid #0f4c75;">
+                                            <h3 style="margin: 0 0 15px 0; color: #0f4c75; font-size: 18px; text-align: center;">ما يمكنك فعله الآن:</h3>
+                                            <ul style="margin: 0; padding: 0; list-style: none; text-align: center;">
+                                                <li style="margin: 8px 0; color: #495057;">📚 إنشاء حلقات تعليمية جديدة</li>
+                                                <li style="margin: 8px 0; color: #495057;">👥 إدارة الطلاب والحضور</li>
+                                                <li style="margin: 8px 0; color: #495057;">💰 تتبع المدفوعات والأرباح</li>
+                                                <li style="margin: 8px 0; color: #495057;">📊 مراجعة التقارير والإحصائيات</li>
+                                                <li style="margin: 8px 0; color: #495057;">💬 التواصل مع الطلاب</li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Support Note -->
+                    <tr>
+                        <td align="center" style="padding: 20px 40px 30px 40px;">
+                            <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+                                <tr>
+                                    <td style="padding: 20px; background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border-radius: 8px; border-left: 4px solid #ffc107;">
+                                        <p style="margin: 0; font-size: 14px; line-height: 21px; color: #856404; text-align: center;">
+                                            <strong>هل تحتاج مساعدة؟</strong><br>
+                                            إذا كان لديك أي استفسار أو تحتاج مساعدة، يرجى التواصل مع فريق الدعم. نحن هنا لمساعدتك في رحلتك التعليمية.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
                     <!-- Footer -->
                     <tr>
                         <td align="center" style="padding: 25px 20px; background: linear-gradient(135deg, #0f4c75 0%, #1e3c72 100%); color: white;">

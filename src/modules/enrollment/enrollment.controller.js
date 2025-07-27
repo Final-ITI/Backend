@@ -10,6 +10,7 @@ import Enrollment from "../../../DB/models/enrollment.js";
 import Halaka from "../../../DB/models/halaka.js";
 import Student from "../../../DB/models/student.js";
 import { EnrollmentService } from "./enrollment.service.js";
+import Teacher from "../../../DB/models/teacher.js";
 
 export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
   const { id: halakaId } = req.body;
@@ -39,30 +40,6 @@ export const enrollInGroupHalaka = asyncHandler(async (req, res, next) => {
       pricePerStudent: halaka.totalPrice,
     },
   });
-
-  // --- Activate ChatGroup integration ---
-  // Add the student's userId to the halaka's chatGroup participants if not already present
-  if (halaka.chatGroup) {
-    const ChatGroup = (await import("../../../DB/models/chatGroup.js")).default;
-    const chatGroup = await ChatGroup.findById(halaka.chatGroup);
-    if (chatGroup) {
-      // Find the full student doc to get the userId
-      const studentDoc = await Student.findById(student._id).populate("userId");
-      if (studentDoc && studentDoc.userId) {
-        const userObjectId = studentDoc.userId._id;
-        if (
-          !chatGroup.participants
-            .map((id) => id.toString())
-            .includes(userObjectId.toString())
-        ) {
-          chatGroup.participants.push(userObjectId);
-          await chatGroup.save();
-        }
-      }
-    }
-  }
-  // --- END ChatGroup integration ---
-
   // 5. Prepare response for the frontend to proceed to payment
   const paymentDetails = {
     enrollmentId: enrollment._id,
@@ -188,6 +165,27 @@ export const actOnInvitation = asyncHandler(async (req, res) => {
   const { status, message } = actionMap[action];
   enrollment.status = status;
   await enrollment.save();
+
+  if (action === "reject" && enrollment.halaka) {
+    const halaka = await Halaka.findById(enrollment.halaka).select(
+      "halqaType student teacher"
+    );
+
+    if (
+      halaka &&
+      halaka.halqaType === "private" &&
+      halaka.student?.toString() === student._id.toString()
+    ) {
+      // remove from teacher's halakat array
+      await Teacher.findByIdAndUpdate(halaka.teacher, {
+        $pull: { halakat: halaka._id },
+      });
+
+      // delete halaka
+      await Halaka.findByIdAndDelete(halaka._id);
+      console.log("🗑️ Deleted private halaka after student rejection");
+    }
+  }
 
   const result = {
     data: { _id: enrollment._id, status: enrollment.status },
