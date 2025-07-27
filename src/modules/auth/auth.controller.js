@@ -216,6 +216,7 @@ export const login = asyncHandler(async (req, res) => {
     );
     if (teacher) {
       userData.verificationStatus = teacher.verificationStatus;
+      userData.isVerified = teacher.isVerified;
       // Also send the rejection reason if the status is 'rejected'
       if (teacher.verificationStatus === "rejected") {
         userData.rejectionReason = teacher.rejectionReason;

@@ -92,10 +92,9 @@ Uploads a verification document for the teacher.
 | --------------------- | -------------------------- |
 | `national_id_front`   | Front side of national ID  |
 | `national_id_back`    | Back side of national ID   |
-| `birth_certificate`   | Birth certificate          |
-| `guardian_id`         | Guardian's ID (for minors) |
-| `teacher_certificate` | Teaching certificate       |
+| `certificates`        | Teacher certificate(s)     |
 | `other`               | Other supporting documents |
+
 
 #### Supported File Types
 

@@ -41,3 +41,17 @@ export const deleteMyDocument = asyncHandler(async (req, res) => {
   // Respond
   success(res, null, "تم حذف المستند بنجاح.");
 });
+
+export const submitForReview = asyncHandler(async (req, res) => {
+  // Call the service to validate and submit for review
+  const result = await TeacherService.submitForReview(req.user._id);
+
+  success(res, result, "تم إرسال طلب التحقق بنجاح. سيتم مراجعته قريباً.");
+});
+
+export const getMyVerificationStatus = asyncHandler(async (req, res) => {
+  // Get the teacher's verification status and requirements
+  const status = await TeacherService.getVerificationStatus(req.user._id);
+
+  success(res, status, "تم جلب حالة التحقق بنجاح.");
+});

@@ -20,7 +20,8 @@ router.get(
 router.get('/:teacherId',validate(validateTeacherId), getTeacherVerificationDetails);
 
 router.post('/documents/:documentId/review', validate(validateDocumentId), reviewDocument);
- // Update teacher verification status
+
+// Update teacher verification status
 router.patch('/:teacherId/status', validate(updateTeacherVerificationStatusValidation), updateTeacherVerificationStatus);
 
 
