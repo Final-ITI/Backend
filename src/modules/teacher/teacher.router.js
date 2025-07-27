@@ -16,8 +16,8 @@ const router = Router();
 
 router.get("/", getFreelanceTeachers);
 
-// New endpoint for getting teacher details by ID
-router.get("/details", getTeacherDetails);
+// New endpoint for getting teacher details by ID from body
+router.post("/get-details", getTeacherDetails);
 
 // Profile endpoints
 router.get("/profile", authenticate, authorize('teacher'), getTeacherProfile);
