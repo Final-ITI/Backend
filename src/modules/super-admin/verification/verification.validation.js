@@ -42,5 +42,13 @@ export const updateTeacherVerificationStatusValidation = [
     .exists()
     .withMessage("الإجراء مطلوب")
     .isIn(["approve", "reject"])
-    .withMessage("يجب أن يكون الإجراء إما 'موافقة' أو 'رفض'"),
-]
+    .withMessage("يجب أن يكون الإجراء إما 'approve' أو 'reject'"),
+
+  body("rejectionReason")
+    .if(body("action").equals("reject"))
+    .exists()
+    .withMessage("سبب الرفض مطلوب عند رفض الطلب")
+    .isLength({ min: 1, max: 500 })
+    .withMessage("يجب أن يتراوح طول سبب الرفض بين 1 و 500 حرف")
+    .trim(),
+];

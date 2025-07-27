@@ -4,6 +4,7 @@ import {
   generateActivationEmail,
   resetPasswordTemp,
   generateHalakaInvitationEmail,
+  generateVerificationResultEmail,
 } from "../utils/mail/generateHTML.js";
 import { sendEmail } from "../utils/mail/sendMail.js";
 
@@ -16,6 +17,16 @@ export const EmailService = {
     return await sendEmail({
       to: email,
       subject: "Activate Account",
+      html,
+    });
+  },
+
+  async sendVerificationResultEmail(email, subject, body) {
+    const html = generateVerificationResultEmail(subject, body);
+
+    return await sendEmail({
+      to: email,
+      subject: subject,
       html,
     });
   },
