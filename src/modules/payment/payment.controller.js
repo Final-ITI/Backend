@@ -308,21 +308,18 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
       );
 
       // d. Update the teacher's wallet
-      const teacherWallet = await TeacherWallet.findOneAndUpdate(
+      await TeacherWallet.findOneAndUpdate(
         { teacher: halaka.teacher },
         { $inc: { pendingBalance: netAmount } },
         { upsert: true, new: true, session }
       );
-      console.log('Halaka:', halaka);
-      if (!teacherWallet) {
-        
-        console.error("Failed to update or create teacher wallet for halaka");
-      }
+     
 
       // c. Create a Zoom meeting if the halaka has a schedule
 
       if (!halaka.zoomMeeting && halaka.halqaType === "private") {
         try {
+          console.log("Creating Zoom meeting for halaka:", halaka._id);
           const zoomRecurrence = getRecurrenceFromSchedule(halaka.schedule);
           const zoomMeeting = await createZoomMeeting({
             topic: halaka.title,
