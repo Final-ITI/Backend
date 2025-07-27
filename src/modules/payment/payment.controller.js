@@ -316,10 +316,9 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
      
 
       // c. Create a Zoom meeting if the halaka has a schedule
-
-      if (!halaka.zoomMeeting && halaka.halqaType === "private") {
+      if ( halaka.halqaType === "private") {
+        console.log("Creating Zoom meeting for private halaka...");
         try {
-          console.log("Creating Zoom meeting for halaka:", halaka._id);
           const zoomRecurrence = getRecurrenceFromSchedule(halaka.schedule);
           const zoomMeeting = await createZoomMeeting({
             topic: halaka.title,
