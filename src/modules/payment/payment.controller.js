@@ -15,6 +15,7 @@ import { sendNotification } from "../../services/notification.service.js";
 import Transaction from "../../../DB/models/transaction.js";
 import { createZoomMeeting } from "../zoom/zoom.service.js";
 import { getRecurrenceFromSchedule } from "../../../DB/models/halaka.js";
+import mongoose from "mongoose";
 import crypto from "crypto";
 
 const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
