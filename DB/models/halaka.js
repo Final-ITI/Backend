@@ -133,19 +133,21 @@ halakaSchema.pre("save", async function (next) {
   this.totalSessions = sessions;
   this.totalPrice = sessions * this.price;
 
-  // create Zoom meeting
-  try {
-    const zoomRecurrence = getRecurrenceFromSchedule(this.schedule);
-    this.zoomMeeting = await createZoomMeeting({
-      topic: this.title,
-      start_time: this.schedule.startDate.toISOString(),
-      duration: this.schedule.duration,
-      timezone: this.schedule.timezone,
-      password: Math.random().toString(36).slice(-8),
-      recurrence: zoomRecurrence,
-    });
-  } catch (err) {
-    return next(err);
+  if (this.halqaType === "halqa") {
+    // create Zoom meeting
+    try {
+      const zoomRecurrence = getRecurrenceFromSchedule(this.schedule);
+      this.zoomMeeting = await createZoomMeeting({
+        topic: this.title,
+        start_time: this.schedule.startDate.toISOString(),
+        duration: this.schedule.duration,
+        timezone: this.schedule.timezone,
+        password: Math.random().toString(36).slice(-8),
+        recurrence: zoomRecurrence,
+      });
+    } catch (err) {
+      return next(err);
+    }
   }
 
   next();
