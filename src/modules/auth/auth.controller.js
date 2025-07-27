@@ -201,7 +201,7 @@ export const login = asyncHandler(async (req, res) => {
 
   // If the logged-in user is a teacher, add isVerified status
   if (user.userType === 'teacher') {
-    const teacher = await Teacher.findOne({ userId: user._id });
+    const teacher = await Teacher.findOne({ userId: user._id }).select("isVerified");
     if (teacher) {
       userData.isVerified = teacher.isVerified;
     }

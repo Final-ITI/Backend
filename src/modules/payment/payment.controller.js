@@ -2,6 +2,7 @@ import axios from "axios";
 import Enrollment from "../../../DB/models/enrollment.js";
 import Student from "../../../DB/models/student.js";
 import User from "../../../DB/models/user.js";
+import Halaka from "../../../DB/models/halaka.js";
 import {
   success,
   notFound,
@@ -12,6 +13,8 @@ import { asyncHandler } from "../../utils/apiError.js";
 import TeacherWallet from "../../../DB/models/teacherWallet.js";
 import { sendNotification } from "../../services/notification.service.js";
 import Transaction from "../../../DB/models/transaction.js";
+import { createZoomMeeting } from "../zoom/zoom.service.js";
+import { getRecurrenceFromSchedule } from "../../../DB/models/halaka.js";
 import crypto from "crypto";
 
 const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
@@ -52,7 +55,13 @@ async function registerPaymobOrder(
 }
 
 // Step 3: Payment Key Request
-async function getPaymobPaymentKey(token, amountCents, orderId, user, integrationId) {
+async function getPaymobPaymentKey(
+  token,
+  amountCents,
+  orderId,
+  user,
+  integrationId
+) {
   const { data } = await axios.post(
     `${PAYMOB_BASE_URL}/acceptance/payment_keys`,
     {
@@ -74,20 +83,23 @@ async function getPaymobPaymentKey(token, amountCents, orderId, user, integratio
         state: "N/A",
       },
       currency: "EGP",
-      integration_id: integrationId, 
+      integration_id: integrationId,
     }
   );
   return data.token;
 }
 // --- Helper function to pay with wallet ---
 async function triggerWalletPayment(paymentKey, phoneNumber) {
-  const { data } = await axios.post(`${PAYMOB_BASE_URL}/acceptance/payments/pay`, {
-    source: {
-      identifier: phoneNumber,
-      subtype: "WALLET"
-    },
-    payment_token: paymentKey
-  });
+  const { data } = await axios.post(
+    `${PAYMOB_BASE_URL}/acceptance/payments/pay`,
+    {
+      source: {
+        identifier: phoneNumber,
+        subtype: "WALLET",
+      },
+      payment_token: paymentKey,
+    }
+  );
   // This request triggers the payment prompt on the user's phone.
   // It doesn't typically return a redirect_url for wallets.
   return data;
@@ -111,6 +123,16 @@ export const initiatePayment = asyncHandler(async (req, res) => {
   if (enrollment.status !== "pending_payment")
     return error(res, "التسجيل ليس في انتظار الدفع", 400);
 
+  const halaka = await Halaka.findById(enrollment.halaka);
+  if (!halaka) return notFound(res, "الحلقة المرتبطة بهذا التسجيل غير موجودة");
+
+  if (
+    halaka.halqaType === "halqa" &&
+    halaka.currentStudents >= halaka.maxStudents
+  ) {
+    return error(res, "عذرًا، لقد اكتمل عدد الطلاب في هذه الحلقة.", 409);
+  }
+
   // --- 3. Prepare payment details ---
   // Use totalPrice, pricePerStudent, or pricePerSession (in that order)
   const amountCents = Math.round(
@@ -122,10 +144,11 @@ export const initiatePayment = asyncHandler(async (req, res) => {
   try {
     // Determine the integration ID based on the payment method
     let integrationId;
-    if (paymentMethod === 'wallet') {
-        integrationId = PAYMOB_WALLET_INTEGRATION_ID;
-    } else { // Default to card payment
-        integrationId = PAYMOB_CARD_INTEGRATION_ID;
+    if (paymentMethod === "wallet") {
+      integrationId = PAYMOB_WALLET_INTEGRATION_ID;
+    } else {
+      // Default to card payment
+      integrationId = PAYMOB_CARD_INTEGRATION_ID;
     }
 
     // --- PAYMOB 3-STEP INTEGRATION LOGIC ---
@@ -170,22 +193,20 @@ export const initiatePayment = asyncHandler(async (req, res) => {
     // Build payment URL (iframe) https://accept.paymob.com/api
     let responseData = { paymentKey, orderId, paymentMethod };
     let message = "تم إنشاء رابط الدفع بنجاح";
-    if (paymentMethod === 'wallet') {
-        // For wallets, we need to get a redirect URL
-        await triggerWalletPayment(paymentKey, walletPhoneNumber);
-        responseData.paymentUrl = null; // Wallets don't use an iframe
-        message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
+    if (paymentMethod === "wallet") {
+      // For wallets, we need to get a redirect URL
+      await triggerWalletPayment(paymentKey, walletPhoneNumber);
+      responseData.paymentUrl = null; // Wallets don't use an iframe
+      message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
     } else {
-        // For cards, we build the iframe URL
-        responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+      // For cards, we build the iframe URL
+      responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
     }
 
+
+
     // --- 4. Return payment URL and details to client ---
-    return success(
-      res,
-      responseData,
-      message,
-    );
+    return success(res, responseData, message);
   } catch (err) {
     // --- 5. Handle errors gracefully ---
     return error(
@@ -212,11 +233,176 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
   }
 
   // --- Step 1: HMAC Signature Validation (Security) ---
-  // This is the most critical security step to ensure the request is from Paymob and hasn't been tampered with.
-  const hmac = req.query.hmac;
-  const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
+    if (!validateHmacSignature(transactionDetails, hmac, hmacSecret)) {
+    console.error("HMAC validation failed. Request might be tampered with.");
+    return forbidden(res, "Invalid HMAC");
+  }
 
-  // Paymob specifies a particular order for the fields used to create the signature.
+  // --- Step 2: Process the Request after ensuring it's secure ---
+
+  // We check that the payment was successful and is not pending.
+  if (
+    transactionDetails.success === true &&
+    transactionDetails.pending === false
+  ) {
+    // We extract the enrollment ID that we previously sent to Paymob.
+    const enrollmentId = transactionDetails.order.merchant_order_id;
+
+    // Use a transaction here to ensure all updates succeed or fail together
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    const enrollment = await Enrollment.findOne({
+      _id: enrollmentId,
+      status: "pending_payment",
+    }).session(session);
+
+    // --- Step 3: Idempotency Check ---
+    // We ensure that we haven't processed this payment before.
+    if (enrollment) {
+      const halaka = await Halaka.findById(enrollment.halaka).session(session);
+      if (!halaka)
+        return notFound(res, "الحلقة المرتبطة بهذا التسجيل غير موجودة");
+      // --- BEST PRACTICE: Final capacity check inside the transaction ---
+      if (
+        halaka.halqaType === "halqa" &&
+        halaka.currentStudents >= halaka.maxStudents
+      ) {
+        // This is a rare race condition, but this check prevents it.
+        // We need to handle this case, perhaps by refunding the user.
+        await session.abortTransaction();
+        return res.status(200).json({ received: true });
+      }
+
+      // a. Update enrollment status and session balance
+      enrollment.status = "active";
+      enrollment.sessionsRemaining = halaka.totalSessions;
+      await enrollment.save({ session });
+      // b. Update halaka (add student to list and increment count)
+      if (halaka.halqaType === "halqa") {
+        halaka.students.push(enrollment.student);
+        halaka.currentStudents += 1;
+        await halaka.save({ session });
+      }
+
+      // c. Create a permanent transaction record
+      const amount = transactionDetails.amount_cents / 100;
+      const platformFee = amount * 0.05; // 5% platform fee
+      const netAmount = amount - platformFee;
+
+      await Transaction.create(
+        [
+          {
+            user: enrollment.student,
+            teacher: halaka.teacher,
+            enrollment: enrollment._id,
+            type: "package_purchase",
+            amount,
+            platformFee,
+            netAmount,
+            gatewayTransactionId: transactionDetails.id.toString(),
+            status: "completed",
+          },
+        ],
+        { session }
+      );
+
+      // d. Update the teacher's wallet
+      await TeacherWallet.findOneAndUpdate(
+        { teacher: halaka.teacher },
+        { $inc: { pendingBalance: netAmount } },
+        { upsert: true, new: true, session }
+      );
+
+      // c. Create a Zoom meeting if the halaka has a schedule
+
+      if (
+        !halaka.zoomMeeting &&
+        halaka.halqaType === "private"
+      ) {
+        try {
+          const zoomRecurrence = getRecurrenceFromSchedule(
+            halaka.schedule
+          );
+          const zoomMeeting = await createZoomMeeting({
+            topic: halaka.title,
+            start_time: halaka.schedule.startDate.toISOString(),
+            duration: halaka.schedule.duration,
+            timezone: halaka.schedule.timezone,
+            password: Math.random().toString(36).slice(-8),
+            recurrence: zoomRecurrence,
+          });
+
+          enrollment.halaka.zoomMeeting = zoomMeeting;
+          await enrollment.halaka.save({ session });
+        } catch (err) {
+          console.error("❌ Failed to create Zoom meeting:", err.message);
+          return error(res, "Failed to create Zoom meeting", 500);
+        }
+      }
+
+      // --- Activate ChatGroup integration ---
+      // Add the student's userId to the halaka's chatGroup participants if not already present
+      if (halaka.chatGroup) {
+        const ChatGroup = (await import("../../../DB/models/chatGroup.js"))
+          .default;
+        const chatGroup = await ChatGroup.findById(halaka.chatGroup);
+        if (chatGroup) {
+          // Find the full student doc to get the userId
+          const studentDoc = await Student.findById(student._id).populate(
+            "userId"
+          );
+          if (studentDoc && studentDoc.userId) {
+            const userObjectId = studentDoc.userId._id;
+            if (
+              !chatGroup.participants
+                .map((id) => id.toString())
+                .includes(userObjectId.toString())
+            ) {
+              chatGroup.participants.push(userObjectId);
+              await chatGroup.save({ session });
+            }
+          }
+        }
+      }
+      // --- END ChatGroup integration ---
+
+      // d. Send success notifications
+      const studentProfile = await Student.findById(enrollment.student).select(
+        "userId"
+      );
+      if (studentProfile) {
+        await sendNotification({
+          recipient: studentProfile.userId,
+          type: "payment_success",
+          message: `Your payment for the halaka "${enrollment.snapshot.halakaTitle}" was successful.`,
+          link: `/Student`,
+        });
+      }
+
+      await session.commitTransaction();
+      console.log(
+        `✅ Successfully processed payment for enrollment: ${enrollmentId}`
+      );
+    } else {
+      console.log(
+        `❕ Payment for enrollment ${enrollmentId} was already processed or not found.`
+      );
+    }
+  }
+
+  // --- Step 4: Send a confirmation response to Paymob ---
+  // We must always send a 200 OK response to let Paymob know we have successfully received the webhook.
+  success(res, { received: true }, "Payment processed successfully");
+});
+
+/**
+ * Validate HMAC signature from Paymob
+ * @param {Object} transactionDetails - Transaction details from Paymob
+ * @param {string} hmac - HMAC signature from query params
+ * @param {string} hmacSecret - Secret key for HMAC validation
+ * @returns {boolean} - True if valid, false otherwise
+ */
+function validateHmacSignature(transactionDetails, hmac, hmacSecret) {
   const hmacFields = [
     transactionDetails.amount_cents,
     transactionDetails.created_at,
@@ -240,94 +426,10 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
     transactionDetails.success,
   ].join("");
 
-  // We create our own signature using the same secret key to compare it.
   const calculatedHmac = crypto
     .createHmac("sha512", hmacSecret)
     .update(hmacFields)
     .digest("hex");
 
-  if (calculatedHmac !== hmac) {
-    // If the signatures don't match, reject the request immediately.
-    console.error("HMAC validation failed. Request might be tampered with.");
-    return forbidden(res, "Invalid HMAC");
-  }
-
-  // --- Step 2: Process the Request after ensuring it's secure ---
-
-  // We check that the payment was successful and is not pending.
-  if (
-    transactionDetails.success === true &&
-    transactionDetails.pending === false
-  ) {
-    // We extract the enrollment ID that we previously sent to Paymob.
-    const enrollmentId = transactionDetails.order.merchant_order_id;
-
-    // We find the enrollment in our database.
-    const enrollment = await Enrollment.findById(enrollmentId).populate({
-      path: "halaka",
-      select: "teacher totalSessions title",
-    });
-
-    // --- Step 3: Idempotency Check ---
-    // We ensure that we haven't processed this payment before.
-    if (enrollment && enrollment.status === "pending_payment") {
-      // a. Update enrollment status and session balance
-      enrollment.status = "active";
-      if (enrollment.halaka && enrollment.halaka.totalSessions) {
-        enrollment.sessionsRemaining = enrollment.halaka.totalSessions;
-      }
-      await enrollment.save();
-
-      // b. Create a permanent transaction record
-      const amount = transactionDetails.amount_cents / 100;
-      const platformFee = amount * 0.05; // 5% platform fee
-      const netAmount = amount - platformFee;
-
-      await Transaction.create({
-        user: enrollment.student, // This should be the Student Profile ID
-        teacher: enrollment.halaka.teacher,
-        enrollment: enrollment._id,
-        // type: enrollment.snapshot.totalPrice ? "package_purchase" : "group_course_payment",
-        type: "package_purchase",
-        amount,
-        platformFee,
-        netAmount,
-        gatewayTransactionId: transactionDetails.id.toString(),
-        status: "completed",
-      });
-
-      // c. Update the teacher's wallet
-      await TeacherWallet.findOneAndUpdate(
-        { teacher: enrollment.halaka.teacher },
-        { $inc: { pendingBalance: netAmount } },
-        { upsert: true, new: true } // upsert: true creates a new wallet if it doesn't exist
-      );
-
-      // d. Send success notifications
-      const studentProfile = await Student.findById(enrollment.student).select(
-        "userId"
-      );
-      if (studentProfile) {
-        await sendNotification({
-          recipient: studentProfile.userId,
-          type: "payment_success",
-          message: `Your payment for the halaka "${enrollment.snapshot.halakaTitle}" was successful.`,
-          link: `/my-courses/${enrollment.halaka._id}`,
-        });
-      }
-      // You can add a notification for the teacher here in the same way
-
-      console.log(
-        `✅ Successfully processed payment for enrollment: ${enrollmentId}`
-      );
-    } else {
-      console.log(
-        `❕ Payment for enrollment ${enrollmentId} was already processed or not found.`
-      );
-    }
-  }
-
-  // --- Step 4: Send a confirmation response to Paymob ---
-  // We must always send a 200 OK response to let Paymob know we have successfully received the webhook.
-  success(res, { received: true }, "Payment processed successfully");
-});
+  return calculatedHmac === hmac;
+}
