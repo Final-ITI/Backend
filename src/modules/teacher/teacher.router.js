@@ -10,10 +10,14 @@ import { authenticate, authorize } from '../../middlewares/auth.middleware.js';
 import multer from "multer";
 import { validate } from "../../middlewares/validation.middleware.js";
 import { updateProfileValidation, uploadDocumentValidation } from "./teacher.profile.validation.js";
+import { getTeacherDetails } from "./teacher.controller.js";
 
 const router = Router();
 
 router.get("/", getFreelanceTeachers);
+
+// New endpoint for getting teacher details by ID
+router.get("/:id", getTeacherDetails);
 
 // Profile endpoints
 router.get("/profile", authenticate, authorize('teacher'), getTeacherProfile);
