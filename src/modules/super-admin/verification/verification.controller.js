@@ -1,8 +1,10 @@
-import { success } from "../../../utils/apiResponse.js";
+import { error, notFound, success } from "../../../utils/apiResponse.js";
 import ApiError, { asyncHandler } from "../../../utils/apiError.js";
 import APIFeatures from "../../../utils/apiFeatures.js";
 import Teacher from "../../../../DB/models/teacher.js";
 import Document from "../../../../DB/models/document.js";
+import { sendNotification } from "../../../services/notification.service.js";
+import { EmailService } from "../../../services/email.service.js";
 
 export const getVerificationRequests = asyncHandler(async (req, res) => {
   const { q, verificationStatus, page = 1 } = req.query;
@@ -204,52 +206,76 @@ export const reviewDocument = asyncHandler(async (req, res) => {
 export const updateTeacherVerificationStatus = asyncHandler(
   async (req, res) => {
     const { teacherId } = req.params;
-    const { action } = req.body;
-
-    if (!["approve", "reject"].includes(action)) {
-      throw new ApiError(
-        "الإجراء غير صالح، يجب أن يكون 'approve' أو 'reject'",
-        400
-      );
-    }
+    const { action, rejectionReason } = req.body;
 
     // Find the teacher
-    const teacher = await Teacher.findById(teacherId);
-    if (!teacher) throw new ApiError("Teacher not found", 404);
+    const teacher = await Teacher.findById(teacherId).populate(
+      "userId",
+      "email"
+    );
+    if (!teacher) return notFound(res, "المعلم غير موجود");
 
-    if (teacher.verificationStatus !== "pending") {
-      throw new ApiError("Teacher verification is not pending", 400);
-    }
+    if (teacher.verificationStatus !== "pending")
+      return error(
+        res,
+        `This teacher's status is already '${teacher.verificationStatus}'`,
+        400
+      );
 
     // Update all teacher's documents
-    const documentStatus = action === "approve" ? "approved" : "rejected";
-    await Document.updateMany(
-      {
-        ownerId: teacherId,
-        ownerType: "teacher",
-        status: "pending",
-      },
-      {
-        status: documentStatus,
-        reviewDate: new Date(),
-        reviewer: req.user._id,
-      }
-    );
+    let notificationMessage;
+    let emailSubject;
+    let emailBody;
+    let responseMessage;
 
-    // Update teacher's verification status
-    teacher.verificationStatus = action === "approve" ? "approved" : "rejected";
-    teacher.isVerified = action === "approve";
+    if (action === "approve") {
+      teacher.verificationStatus = "approved";
+      teacher.isVerified = true;
+      teacher.rejectionReason = undefined; // Clear any previous rejection reason
+
+      notificationMessage =
+        "تهانينا! تم التحقق من حسابك. يمكنك الآن البدء في إنشاء الحلقات.";
+      emailSubject = "تم التحقق من حسابك كمعلم";
+      emailBody = `مرحبًا، لقد تمت مراجعة طلبك والموافقة عليه. يمكنك الآن تسجيل الدخول والبدء في استخدام المنصة.`;
+      responseMessage = "تمت الموافقة على طلب التحقق بنجاح.";
+    } else {
+      teacher.verificationStatus = "rejected";
+      teacher.isVerified = false;
+      teacher.rejectionReason = rejectionReason; // Save the reason for rejection
+
+      notificationMessage = `نأسف، تم رفض طلب التحقق الخاص بك. السبب: ${rejectionReason}`;
+      emailSubject = "تحديث بخصوص طلب التحقق الخاص بك";
+      emailBody = `مرحبًا، بعد مراجعة طلبك، تم رفضه للسبب التالي: "${rejectionReason}". يرجى تسجيل الدخول لتعديل بياناتك وإعادة التقديم.`;
+      responseMessage = "تم رفض طلب التحقق بنجاح.";
+    }
     await teacher.save();
+    try {
+      // 1. Send in-app notification
+      await sendNotification({
+        recipient: teacher.userId._id,
+        type: "system_alert",
+        message: notificationMessage,
+        link: "/verification-status", // A dedicated page for status
+      });
 
-    const message =
-      action === "approve"
-        ? "تمت الموافقة على جميع مستندات المعلم بنجاح."
-        : "تم رفض جميع مستندات المعلم بنجاح.";
+      // 2. Send email
+      await EmailService.sendVerificationResultEmail(
+        teacher.userId.email,
+        emailSubject,
+        emailBody
+      );
+    } catch (notificationError) {
+      // Log the error but don't fail the entire request
+      console.error(
+        `Failed to send notification/email to teacher ${teacher._id}:`,
+        notificationError
+      );
+    }
 
     success(
       res,
       { teacherId, verificationStatus: teacher.verificationStatus },
-      message
+      responseMessage
     );
   }
 );

@@ -358,7 +358,6 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
           }
         }
       }
-      // --- END ChatGroup integration ---
 
       // d. Send success notifications
 
