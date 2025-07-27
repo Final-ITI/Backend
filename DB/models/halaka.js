@@ -370,7 +370,7 @@ export function getAllSessionDates(schedule, needed) {
   return dates;
 }
 
-function getRecurrenceFromSchedule(schedule) {
+export function getRecurrenceFromSchedule(schedule) {
   const dayMap = {
     sunday: 1,
     monday: 2,
