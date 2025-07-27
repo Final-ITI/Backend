@@ -6,7 +6,7 @@ import {
   listTeacherDocuments,
   deleteTeacherDocument,
 } from "./teacher.profile.controller.js";
-import { authenticate , authorize } from '../../middlewares/auth.middleware.js';
+import { authenticate, authorize } from '../../middlewares/auth.middleware.js';
 import multer from "multer";
 import { validate } from "../../middlewares/validation.middleware.js";
 import { updateProfileValidation, uploadDocumentValidation } from "./teacher.profile.validation.js";

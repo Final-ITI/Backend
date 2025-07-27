@@ -142,6 +142,7 @@ fetch("/api/v1/teacher?gender=female&halqaType=halqa");
 Returns the authenticated teacher's personal profile, including basic info, professional info, and uploaded documents.
 
 #### Example Response
+
 ```json
 {
   "status": "success",
@@ -175,9 +176,20 @@ Returns the authenticated teacher's personal profile, including basic info, prof
 
 **PUT** `/profile`
 
-Update teacher's personal and professional info. Accepts fields: `bio`, `experience`, `specialization`, `address`, `phone`, `email`, `fullName`.
+Update teacher's personal and professional info. This endpoint also handles document uploads. If a document is uploaded, `docType` is required.
 
-#### Example Request
+Accepts fields: `bio`, `experience`, `specialization`, `address`, `phone`, `email`, `fullName`, `birthdate`, `highestDegree`, `subjects`, and `file` (for document upload), `docType` (required if `file` is present).
+
+#### Example Request (Partial Profile Update)
+
+```json
+{
+  "phone": "+1234567890"
+}
+```
+
+#### Example Request (Profile Update with Document Upload)
+
 ```json
 {
   "bio": "Specialized in Islamic studies...",
@@ -186,7 +198,11 @@ Update teacher's personal and professional info. Accepts fields: `bio`, `experie
   "address": "Jeddah, Saudi Arabia",
   "phone": "+654398750966",
   "email": "sarah.ahmad@example.com",
-  "fullName": "Sarah Ahmad"
+  "fullName": "Sarah Ahmad",
+  "birthdate": "1990-01-01T00:00:00.000Z",
+  "highestDegree": "PhD in Islamic Studies",
+  "subjects": ["Fiqh", "Hadith"],
+  "docType": "certificates" // Required if a file is uploaded
 }
 ```
 
@@ -194,21 +210,7 @@ Update teacher's personal and professional info. Accepts fields: `bio`, `experie
 
 **POST** `/profile/documents`
 
-Upload a document for the teacher. Accepts a file (form-data, key: `file`) and `docType` (e.g., `certificates`, `national_id_front`).
-
-#### Example Response
-```json
-{
-  "status": "success",
-  "message": "Document uploaded successfully",
-  "data": {
-    "_id": "doc_id",
-    "docType": "certificates",
-    "fileUrl": "https://cloudinary.com/...",
-    "status": "pending"
-  }
-}
-```
+This endpoint is no longer used for uploading documents as it has been integrated into the PUT /profile endpoint. This section will be removed.
 
 ### 5. List Teacher Documents
 

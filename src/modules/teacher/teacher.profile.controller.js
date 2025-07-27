@@ -36,7 +36,7 @@ export const getTeacherProfile = asyncHandler(async (req, res) => {
       status: doc.status
     })),
     profile: {
-      fullName:user?.fullName,
+      fullName: user?.fullName,
       firstName: user?.firstName,
       lastName: user?.lastName,
       email: user?.email,
@@ -110,7 +110,7 @@ export const updateTeacherProfileAndDocument = asyncHandler(async (req, res) => 
       status: doc.status
     })),
     profile: {
-      fullName:user?.fullName,
+      fullName: user?.fullName,
       firstName: user?.firstName,
       lastName: user?.lastName,
       email: user?.email,
