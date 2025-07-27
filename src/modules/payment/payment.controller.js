@@ -52,7 +52,13 @@ async function registerPaymobOrder(
 }
 
 // Step 3: Payment Key Request
-async function getPaymobPaymentKey(token, amountCents, orderId, user, integrationId) {
+async function getPaymobPaymentKey(
+  token,
+  amountCents,
+  orderId,
+  user,
+  integrationId
+) {
   const { data } = await axios.post(
     `${PAYMOB_BASE_URL}/acceptance/payment_keys`,
     {
@@ -74,20 +80,23 @@ async function getPaymobPaymentKey(token, amountCents, orderId, user, integratio
         state: "N/A",
       },
       currency: "EGP",
-      integration_id: integrationId, 
+      integration_id: integrationId,
     }
   );
   return data.token;
 }
 // --- Helper function to pay with wallet ---
 async function triggerWalletPayment(paymentKey, phoneNumber) {
-  const { data } = await axios.post(`${PAYMOB_BASE_URL}/acceptance/payments/pay`, {
-    source: {
-      identifier: phoneNumber,
-      subtype: "WALLET"
-    },
-    payment_token: paymentKey
-  });
+  const { data } = await axios.post(
+    `${PAYMOB_BASE_URL}/acceptance/payments/pay`,
+    {
+      source: {
+        identifier: phoneNumber,
+        subtype: "WALLET",
+      },
+      payment_token: paymentKey,
+    }
+  );
   // This request triggers the payment prompt on the user's phone.
   // It doesn't typically return a redirect_url for wallets.
   return data;
@@ -122,10 +131,11 @@ export const initiatePayment = asyncHandler(async (req, res) => {
   try {
     // Determine the integration ID based on the payment method
     let integrationId;
-    if (paymentMethod === 'wallet') {
-        integrationId = PAYMOB_WALLET_INTEGRATION_ID;
-    } else { // Default to card payment
-        integrationId = PAYMOB_CARD_INTEGRATION_ID;
+    if (paymentMethod === "wallet") {
+      integrationId = PAYMOB_WALLET_INTEGRATION_ID;
+    } else {
+      // Default to card payment
+      integrationId = PAYMOB_CARD_INTEGRATION_ID;
     }
 
     // --- PAYMOB 3-STEP INTEGRATION LOGIC ---
@@ -170,22 +180,18 @@ export const initiatePayment = asyncHandler(async (req, res) => {
     // Build payment URL (iframe) https://accept.paymob.com/api
     let responseData = { paymentKey, orderId, paymentMethod };
     let message = "تم إنشاء رابط الدفع بنجاح";
-    if (paymentMethod === 'wallet') {
-        // For wallets, we need to get a redirect URL
-        await triggerWalletPayment(paymentKey, walletPhoneNumber);
-        responseData.paymentUrl = null; // Wallets don't use an iframe
-        message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
+    if (paymentMethod === "wallet") {
+      // For wallets, we need to get a redirect URL
+      await triggerWalletPayment(paymentKey, walletPhoneNumber);
+      responseData.paymentUrl = null; // Wallets don't use an iframe
+      message = "تم إرسال طلب الدفع إلى هاتفك المحمول. يرجى التأكيد.";
     } else {
-        // For cards, we build the iframe URL
-        responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+      // For cards, we build the iframe URL
+      responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
     }
 
     // --- 4. Return payment URL and details to client ---
-    return success(
-      res,
-      responseData,
-      message,
-    );
+    return success(res, responseData, message);
   } catch (err) {
     // --- 5. Handle errors gracefully ---
     return error(
@@ -265,7 +271,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
     // We find the enrollment in our database.
     const enrollment = await Enrollment.findById(enrollmentId).populate({
       path: "halaka",
-      select: "teacher totalSessions title",
+      select: "teacher totalSessions title ",
     });
 
     // --- Step 3: Idempotency Check ---
