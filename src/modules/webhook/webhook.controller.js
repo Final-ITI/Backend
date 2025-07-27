@@ -1,8 +1,10 @@
 import Halaka from "../../../DB/models/halaka.js";
 import User from "../../../DB/models/user.js";
 import Student from "../../../DB/models/student.js";
+import Teacher from "../../../DB/models/teacher.js";
 import crypto from "crypto";
 import { success, error, notFound } from "../../utils/apiResponse.js";
+import { sendNotification } from "../../services/notification.service.js";
 
 /**
  * Find the session date from schedule that matches the event date.
@@ -195,7 +197,12 @@ export const zoomAttendanceWebhook = async (req, res) => {
     if (!eventTime) eventTime = new Date().toISOString();
 
     // 1. Find halaka by Zoom meetingId
-    const halaka = await Halaka.findOne({ "zoomMeeting.meetingId": meetingId });
+    const halaka = await Halaka.findOne({
+      "zoomMeeting.meetingId": meetingId,
+    }).populate({
+      path: "teacher",
+      select: "userId",
+    });
     if (!halaka) return notFound(res, "Halaka not found for meeting", 404);
 
     // 2. Find user & student
@@ -204,6 +211,8 @@ export const zoomAttendanceWebhook = async (req, res) => {
 
     const student = await Student.findOne({ userId: user._id });
     if (!student) return notFound(res, "Student not found for this email", 404);
+
+    // 3. Find teacher (if needed)
 
     // --- Restrict to only enrolled students ---
     if (halaka.halqaType === "private") {
@@ -251,6 +260,43 @@ export const zoomAttendanceWebhook = async (req, res) => {
         action: "join",
         eventTime,
       });
+
+      // --- Send notification for join event ---
+      const notificationData = {
+        recipient: halaka.teacher.userId,
+        type: "halaka_session_reminder",
+        message: `Meeting for ${halaka.title} has been started`,
+      };
+      await sendNotification(notificationData);
+
+      // send notification to students in public halaka
+
+      if (halaka.halakaType === "halqa") {
+        for (const studentId of halaka.students) {
+          const student = await Student.findById(studentId);
+          if (!student) continue;
+
+          const studentNotificationData = {
+            recipient: student.userId,
+            type: "halaka_session_reminder",
+            message: `Meeting for ${halaka.title} has been started`,
+          };
+          await sendNotification(studentNotificationData);
+        }
+      }
+
+      //send notification  to student if private halaka
+      if (halaka.halqaType === "private") {
+        const student = await Student.findById(halaka.student);
+        if (student) {
+          const studentNotificationData = {
+            recipient: student.userId,
+            type: "halaka_session_reminder",
+            message: `Meeting for ${halaka.title} has been started`,
+          };
+          await sendNotification(studentNotificationData);
+        }
+      }
     }
     if (event === "meeting.participant_left") {
       await upsertAttendance({

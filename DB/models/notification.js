@@ -22,7 +22,15 @@ const notificationSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ["chat_message", "halaka_invitation", "payment_success", "system_alert" , "private_halaka_invitation",'system_alert'],
+      enum: [
+        "chat_message",
+        "halaka_invitation",
+        "payment_success",
+        "system_alert",
+        "private_halaka_invitation",
+        "system_alert",
+        "halaka_session_reminder",
+      ],
     },
 
     message: {
@@ -47,5 +55,7 @@ const notificationSchema = new Schema(
   }
 );
 
-const Notification = mongoose.models.Notification || mongoose.model("Notification", notificationSchema);
+const Notification =
+  mongoose.models.Notification ||
+  mongoose.model("Notification", notificationSchema);
 export default Notification;
