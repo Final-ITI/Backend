@@ -38,3 +38,11 @@ export const uploadDocumentValidation = [
     ])
     .withMessage("يجب أن يكون نوع المستند أحد الخيارات التالية: national_id_front, national_id_back, certificates, qualification_certificate, student_id, birth_certificate, guardian_id, teaching_license, tajweed_certification, academy_license, commercial_registration"),
 ];
+
+export const getTeacherDetailsValidation = [
+  body('teacherId')
+    .notEmpty()
+    .withMessage('معرف المعلم مطلوب.')
+    .isMongoId()
+    .withMessage('معرف المعلم غير صالح.'),
+];

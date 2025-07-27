@@ -9,7 +9,7 @@ import {
 import { authenticate, authorize } from '../../middlewares/auth.middleware.js';
 import multer from "multer";
 import { validate } from "../../middlewares/validation.middleware.js";
-import { updateProfileValidation, uploadDocumentValidation } from "./teacher.profile.validation.js";
+import { updateProfileValidation, uploadDocumentValidation, getTeacherDetailsValidation } from "./teacher.profile.validation.js";
 import { getTeacherDetails } from "./teacher.controller.js";
 
 const router = Router();
@@ -17,7 +17,7 @@ const router = Router();
 router.get("/", getFreelanceTeachers);
 
 // New endpoint for getting teacher details by ID from body
-router.post("/get-details", getTeacherDetails);
+router.post("/get-details", validate(getTeacherDetailsValidation), getTeacherDetails);
 
 // Profile endpoints
 router.get("/profile", authenticate, authorize('teacher'), getTeacherProfile);
