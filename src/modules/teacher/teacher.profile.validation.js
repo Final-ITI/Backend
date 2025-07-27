@@ -15,5 +15,26 @@ export const updateProfileValidation = [
 ];
 
 export const uploadDocumentValidation = [
-  body('docType').notEmpty().withMessage('نوع الوثيقة مطلوب'),
+  body('docType')
+    .optional()
+    .custom((value, { req }) => {
+      if (req.file && !value) {
+        throw new Error('نوع الوثيقة مطلوب عند تحميل ملف.');
+      }
+      return true;
+    })
+    .isIn([
+      "national_id_front",
+      "national_id_back",
+      "certificates",
+      "qualification_certificate",
+      "student_id",
+      "birth_certificate",
+      "guardian_id",
+      "teaching_license",
+      "tajweed_certification",
+      "academy_license",
+      "commercial_registration",
+    ])
+    .withMessage("يجب أن يكون نوع المستند أحد الخيارات التالية: national_id_front, national_id_back, certificates, qualification_certificate, student_id, birth_certificate, guardian_id, teaching_license, tajweed_certification, academy_license, commercial_registration"),
 ];
