@@ -313,10 +313,9 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
         { $inc: { pendingBalance: netAmount } },
         { upsert: true, new: true, session }
       );
-     
 
       // c. Create a Zoom meeting if the halaka has a schedule
-      if ( halaka.halqaType === "private") {
+      if (halaka.halqaType === "private") {
         console.log("Creating Zoom meeting for private halaka...");
         try {
           const zoomRecurrence = getRecurrenceFromSchedule(halaka.schedule);
@@ -337,17 +336,15 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
         }
       }
 
-      // --- Activate ChatGroup integration ---
+      const studentDoc = await Student.findById(enrollment.student).populate(
+        "userId"
+      );
       // Add the student's userId to the halaka's chatGroup participants if not already present
       if (halaka.chatGroup) {
         const ChatGroup = (await import("../../../DB/models/chatGroup.js"))
           .default;
         const chatGroup = await ChatGroup.findById(halaka.chatGroup);
         if (chatGroup) {
-          // Find the full student doc to get the userId
-          const studentDoc = await Student.findById(student._id).populate(
-            "userId"
-          );
           if (studentDoc && studentDoc.userId) {
             const userObjectId = studentDoc.userId._id;
             if (
@@ -364,12 +361,10 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
       // --- END ChatGroup integration ---
 
       // d. Send success notifications
-      const studentProfile = await Student.findById(enrollment.student).select(
-        "userId"
-      );
-      if (studentProfile) {
+
+      if (studentDoc) {
         await sendNotification({
-          recipient: studentProfile.userId,
+          recipient: studentDoc.userId,
           type: "payment_success",
           message: `Your payment for the halaka "${enrollment.snapshot.halakaTitle}" was successful.`,
           link: `/Student`,
