@@ -333,8 +333,8 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
             recurrence: zoomRecurrence,
           });
 
-          enrollment.halaka.zoomMeeting = zoomMeeting;
-          await enrollment.halaka.save({ session });
+          halaka.zoomMeeting = zoomMeeting;
+          await halaka.save({ session });
         } catch (err) {
           console.error("❌ Failed to create Zoom meeting:", err.message);
           return error(res, "Failed to create Zoom meeting", 500);
