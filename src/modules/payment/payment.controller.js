@@ -226,6 +226,8 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
   // --- Step 0: Receive Data from Paymob ---
   // Paymob sends all data in the req.body object
   const { obj: transactionDetails } = req.body;
+  const { hmac } = req.query; 
+  const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
 
   if (!transactionDetails) {
     // If no data is received, send an error
