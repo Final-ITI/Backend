@@ -138,8 +138,8 @@ const teacherSchema = new Schema(
     },
     verificationStatus: {
       type: String,
-      enum: ["pending", "approved", "rejected", "suspended"],
-      default: "pending",
+      enum: ["not_submitted", "pending", "approved", "rejected", "suspended"],
+      default: "not_submitted",
     },
   },
   {

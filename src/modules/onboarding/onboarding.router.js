@@ -13,6 +13,8 @@ import {
   profile,
   uploadMyDocument,
   deleteMyDocument,
+  submitForReview,
+  getMyVerificationStatus,
 } from "./onboarding.controller.js";
 import { Router } from "express";
 import { createUploadMiddleware, fileType } from "../../utils/multer.js";
@@ -51,5 +53,11 @@ router.delete(
   attachProfileByRole,
   deleteMyDocument
 );
+
+// Submit for review
+router.post("/submit-for-review", submitForReview);
+
+// Get verification status
+router.get("/verification-status", getMyVerificationStatus);
 
 export default router;
