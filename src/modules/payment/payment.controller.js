@@ -204,8 +204,6 @@ export const initiatePayment = asyncHandler(async (req, res) => {
       responseData.paymentUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
     }
 
-
-
     // --- 4. Return payment URL and details to client ---
     return success(res, responseData, message);
   } catch (err) {
@@ -227,7 +225,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
   // --- Step 0: Receive Data from Paymob ---
   // Paymob sends all data in the req.body object
   const { obj: transactionDetails } = req.body;
-  const { hmac } = req.query; 
+  const { hmac } = req.query;
   const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
 
   if (!transactionDetails) {
@@ -236,7 +234,7 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
   }
 
   // --- Step 1: HMAC Signature Validation (Security) ---
-    if (!validateHmacSignature(transactionDetails, hmac, hmacSecret)) {
+  if (!validateHmacSignature(transactionDetails, hmac, hmacSecret)) {
     console.error("HMAC validation failed. Request might be tampered with.");
     return forbidden(res, "Invalid HMAC");
   }
@@ -310,22 +308,22 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
       );
 
       // d. Update the teacher's wallet
-      await TeacherWallet.findOneAndUpdate(
+      const teacherWallet = await TeacherWallet.findOneAndUpdate(
         { teacher: halaka.teacher },
         { $inc: { pendingBalance: netAmount } },
         { upsert: true, new: true, session }
       );
+      console.log('Halaka:', halaka);
+      if (!teacherWallet) {
+        
+        console.error("Failed to update or create teacher wallet for halaka");
+      }
 
       // c. Create a Zoom meeting if the halaka has a schedule
 
-      if (
-        !halaka.zoomMeeting &&
-        halaka.halqaType === "private"
-      ) {
+      if (!halaka.zoomMeeting && halaka.halqaType === "private") {
         try {
-          const zoomRecurrence = getRecurrenceFromSchedule(
-            halaka.schedule
-          );
+          const zoomRecurrence = getRecurrenceFromSchedule(halaka.schedule);
           const zoomMeeting = await createZoomMeeting({
             topic: halaka.title,
             start_time: halaka.schedule.startDate.toISOString(),
@@ -340,8 +338,8 @@ export const paymobPaymentWebhook = asyncHandler(async (req, res) => {
         } catch (err) {
           console.error("❌ Failed to create Zoom meeting:", err.message);
           return error(res, "Failed to create Zoom meeting", 500);
-        }
-      }
+        }
+      }
 
       // --- Activate ChatGroup integration ---
       // Add the student's userId to the halaka's chatGroup participants if not already present
