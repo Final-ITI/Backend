@@ -1,4 +1,6 @@
 import Teacher from "../../../DB/models/teacher.js";
+import mongoose from "mongoose";
+import Academy from "../../../DB/models/academy.js";
 
 
 export async function getFreelanceTeachersService({
@@ -64,7 +66,44 @@ export async function getFreelanceTeachersService({
   return { responseData, paginationInfo };
 }
 
+export async function getTeacherDetailsService(teacherId) {
+  const teacher = await Teacher.findById(teacherId)
+    .populate('userId', 'firstName lastName email gender country profilePicture') // Populate user details
+    .populate('halakat') // Populate halakat if needed
+    .populate('academyId'); // Populate academy details if needed
 
+  if (!teacher) {
+    return null;
+  }
+
+  // Manually populate documents as a separate query
+  const documents = await mongoose.model('Document').find({ ownerId: teacher._id, ownerType: 'teacher' });
+
+  // Construct the response object for a student's view
+  const teacherDetails = {
+    _id: teacher._id,
+    firstName: teacher.userId?.firstName,
+    lastName: teacher.userId?.lastName,
+    email: teacher.userId?.email,
+    gender: teacher.userId?.gender,
+    country: teacher.userId?.country,
+    profilePicture: teacher.userId?.profilePicture,
+    specialization: teacher.specialization,
+    bio: teacher.bio,
+    experience: teacher.experience,
+    subjects: teacher.subjects,
+    highestDegree: teacher.highestDegree,
+    sessionPrice: teacher.sessionPrice,
+    currency: teacher.currency,
+    performance: teacher.performance,
+    isVerified: teacher.isVerified,
+    // We can include a simplified view of the academy if needed, or just the ID
+    academyName: teacher.academyId?.academyName, // Assuming academyId is populated as 'academy' and has academyName
+    academyId: teacher.academyId?._id, // Keep the ID if needed for frontend to fetch full academy details
+  };
+
+  return teacherDetails;
+}
 
 /* Helper functions to build match and pipeline */
 function buildTeacherMatch({ specialization, rating, minPrice, maxPrice }) {
