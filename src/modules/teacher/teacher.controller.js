@@ -42,7 +42,7 @@ export const getFreelanceTeachers = asyncHandler(async (req, res) => {
  * Get details of a specific teacher by ID.
  */
 export const getTeacherDetails = asyncHandler(async (req, res) => {
-  const teacherId = req.params.id;
+  const { teacherId } = req.body;
   const teacherDetails = await getTeacherDetailsService(teacherId);
   if (!teacherDetails) {
     throw new ApiError("لم يتم العثور على المعلم", 404);
