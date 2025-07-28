@@ -24,7 +24,9 @@ export const sendNotification = async (notificationData) => {
     // 3. Attempt to send a real-time notification
     const recipientIdString = populatedNotification.recipient.toString();
     const receiverSocketId = userSocketMap[recipientIdString];
-
+    console.log(
+      `Attempting to send notification to user ${recipientIdString} with socket ID ${receiverSocketId}`
+    );
     if (receiverSocketId && io) {
       console.log(
         `Sending notification to user ${recipientIdString} via socket ${receiverSocketId}`
