@@ -16,20 +16,29 @@ export const sendNotification = async (notificationData) => {
     // 1. Save the notification to the database
     const notification = await Notification.create(notificationData);
 
-    // 2. Attempt to send a real-time notification
-    // Convert the recipient's ObjectId to a string before looking it up
-    const recipientIdString = notification.recipient.toString();
-    const receiverSocketId = userSocketMap[recipientIdString];
-    
-    if (receiverSocketId && io) {
-      console.log(`Sending notification to user ${recipientIdString} via socket ${receiverSocketId}`);
-      io.to(receiverSocketId).emit("new_notification", notification);
-    } else {
-      console.log(`User ${recipientIdString} is not online. Notification saved to DB.`);
-    }
-    
-    return notification;
+    // 2. FIX: Populate sender details before emitting
+    const populatedNotification = await Notification.findById(
+      notification._id
+    ).populate("sender", "firstName lastName profileImage");
 
+    // 3. Attempt to send a real-time notification
+    // Convert the recipient's ObjectId to a string before looking it up
+    const recipientIdString = populatedNotification.recipient.toString();
+    const receiverSocketId = userSocketMap[recipientIdString];
+
+    if (receiverSocketId && io) {
+      console.log(
+        `Sending notification to user ${recipientIdString} via socket ${receiverSocketId}`
+      );
+
+      io.to(receiverSocketId).emit("new_notification", populatedNotification);
+    } else {
+      console.log(
+        `User ${recipientIdString} is not online. Notification saved to DB.`
+      );
+    }
+
+    return notification;
   } catch (error) {
     console.error("Error sending notification:", error);
   }

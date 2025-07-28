@@ -431,7 +431,7 @@ export function generateVerificationResultEmail(subject, body) {
                                                     <table role="presentation" border="0" cellspacing="0" cellpadding="0">
                                                         <tr>
                                                             <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #0f4c75 0%, #1e3c72 100%); box-shadow: 0 4px 15px rgba(15, 76, 117, 0.3);">
-                                                                <a href="${process.env.FE_URL}/teacher/dashboard" target="_blank" style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px; text-align: center; text-transform: uppercase; letter-spacing: 1px;">
+                                                                <a href="${process.env.FE_URL}/Teacher" target="_blank" style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px; text-align: center; text-transform: uppercase; letter-spacing: 1px;">
                                                                     🏠 الذهاب للوحة التحكم
                                                                 </a>
                                                             </td>
