@@ -16,7 +16,7 @@ export const sendNotification = async (notificationData) => {
     // 1. Save the notification to the database
     const notification = await Notification.create(notificationData);
 
-    // 2. FIX: Populate sender details before emitting
+    // 2. Populate sender details before emitting
     const populatedNotification = await Notification.findById(
       notification._id
     ).populate("sender", "firstName lastName profileImage");
