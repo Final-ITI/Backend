@@ -13,14 +13,15 @@ import { io, userSocketMap } from "../socket/socket.js"; // استيراد io و
  */
 export const sendNotification = async (notificationData) => {
   try {
+    console.log("##############################");
     // 1. Save the notification to the database
     const notification = await Notification.create(notificationData);
-
+    console.log("Notification saved to DB:", notification);
     // 2. Populate sender details before emitting
     const populatedNotification = await Notification.findById(
       notification._id
     ).populate("sender", "firstName lastName profileImage");
-
+    console.log("Populated notification:", populatedNotification);
     // 3. Attempt to send a real-time notification
     const recipientIdString = populatedNotification.recipient.toString();
     const receiverSocketId = userSocketMap[recipientIdString];
