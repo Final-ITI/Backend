@@ -22,7 +22,6 @@ export const sendNotification = async (notificationData) => {
     ).populate("sender", "firstName lastName profileImage");
 
     // 3. Attempt to send a real-time notification
-    // Convert the recipient's ObjectId to a string before looking it up
     const recipientIdString = populatedNotification.recipient.toString();
     const receiverSocketId = userSocketMap[recipientIdString];
 
