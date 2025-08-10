@@ -202,6 +202,8 @@ function buildTeacherPipeline({
       sessionPrice: 1,
       currency: 1,
       performance: 1,
+      experience: 1,
+      numberOfStudents: '$performance.totalStudents',
       bio: 1,
       isVerified: 1,
       user: {
